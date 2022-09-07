@@ -1,14 +1,14 @@
-English | [简体中文](./README.zh-CN.md)
+[English](./README.md) | 简体中文
 
-# DataRangers iOS SDK
+# 增长分析营销套件 iOS SDK
 
-## Usage
+## 使用
 
-> For more information: [Integration Document](https://www.volcengine.com/docs/6285/65978)
+> 更多信息请查看：[集成文档](https://www.volcengine.com/docs/6285/65978)
 
-### 1. Initialize the SDK
+### 1. 初始化 SDK
 
-Initialize SDK in `application:didFinishLaunchingWithOptions:`
+在 `application:didFinishLaunchingWithOptions:` 中初始化 SDK。
 
 ```objc
 
@@ -21,21 +21,21 @@ Initialize SDK in `application:didFinishLaunchingWithOptions:`
     config.appName = <# enter your your app name #>;
     config.channel = <# enter your your app channel #>;
 
-    config.abEnable = YES;      //enable A/B test
+    config.abEnable = YES;      //开启 ABTesting
     
-    config.encryptionDelegate = <# Custom encryption definition #> //Provides an implementation of BDAutoTrackEncryptionDelegate encryption protocol
-    config.logNeedEncrypt = YES; //enable encryption, YES by default
+    config.encryptionDelegate = <# Custom encryption definition #> //由用户提供支持BDAutoTrackEncryptionDelegate协议的加密实现
+    config.logNeedEncrypt = YES; //开启报文加密、默认YES
 
-    config.showDebugLog = YES;  //enable console log, NO by default
+    config.showDebugLog = YES;  //开启命令行日志、默认NO
 
-    config.serviceVendor = BDAutoTrackServiceVendorPrivate; //Identifies the use of privatized deployment servers
+    config.serviceVendor = BDAutoTrackServiceVendorPrivate; //标识服务路径为客户私有化部署服务器
 
     [BDAutoTrack sharedTrackWithConfig:config];
 
-    //Provides host of privatized deployment servers
+    //提供私有化部署的访问域名
     [[BDAutoTrack sharedTrack] setRequestHostBlock:^NSString * _Nullable(BDAutoTrackServiceVendor  _Nonnull vendor, BDAutoTrackRequestURLType requestURLType) {
         return <# your server host #>
-    }];
+    }]; 
     
     [[BDAutoTrack sharedTrack] startTrack];
     
@@ -43,7 +43,7 @@ Initialize SDK in `application:didFinishLaunchingWithOptions:`
 
 ```
 
-### 2. Track event
+### 2. 上报事件
 
 ```objc
 
