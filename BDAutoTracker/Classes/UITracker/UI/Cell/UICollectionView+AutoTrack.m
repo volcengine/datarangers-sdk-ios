@@ -28,14 +28,11 @@
         SEL originalForwardInvocationSEL = @selector(forwardInvocation:);
         SEL aSelector = @selector(collectionView:didSelectItemAtIndexPath:);
         for (NSObject *target in targets) {
-            /// 这里一般是返回的target
             if (bd_swizzle_has_selector(target, aSelector)) {
                 id<UICollectionViewDelegate> delegate = (id<UICollectionViewDelegate>)target;
                 [delegate collectionView:collectionView didSelectItemAtIndexPath:indexPath];
             } else {
-                /// 这里一般是Proxy
                 NSMethodSignature *methodSignature = [target methodSignatureForSelector:aSelector];
-                /// fix for IGListAdapterProxy
                 if (methodSignature.numberOfArguments != 4) {
                     return;
                 }
@@ -74,7 +71,6 @@
                     return;
                 }
                 
-                // 正常的代理对象，有`collectionView:didSelectItemAtIndexPath:`这个方法的。Hook此方法，以截获点击事件。
                 Class delegateClass = object_getClass(delegate);
                 SEL didSelectItemSelector = @selector(collectionView:didSelectItemAtIndexPath:);
                 if (bd_swizzle_has_selector(delegate, didSelectItemSelector)) {
@@ -89,9 +85,10 @@
                         }
                     };
                     delegateSwizzle.originIMP = bd_swizzle_instance_methodWithBlock([delegate class], didSelectItemSelector, delegateBlock);
+                    
+                    BDDelegateDecorator *delegateDecorator = [BDDelegateDecorator decoratorForDelegate:delegate];
+                    [delegateDecorator removeDecoratorForSelector:didSelectItemSelector];
                 } else {
-                    // 非正常的代理对象，没有此方法。查看forwarding target是否有此方法。
-                    // 如果forwarding target也没有，则获取不到。
                     BOOL hasMark = bd_swizzle_has_selector(delegate, @selector(bd_decoratorMark));
                     if (!hasMark) {
                         id responder = [delegate forwardingTargetForSelector:didSelectItemSelector];

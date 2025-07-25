@@ -20,6 +20,8 @@ NSString * const kBDPickerPicURL                        = @"picUrl";
 NSString * const kBDPickerNeedUpload                    = @"needUploadPic";
 NSString * const kBDPickerIsBind                        = @"isBind";
 NSString * const kBDPickerIsHTML                        = @"isHtml";
+NSString * const kBDPickerIgnore                        = @"ignore";
+NSString * const kBDPickerChildren                      = @"children";
 
 
 
@@ -32,6 +34,3 @@ NSString * const BDPickerImageBack          = @"bd_picker_back";
 NSString * const BDPickerImageTip           = @"bd_picker_tip";
 NSString * const BDPickerImageDetail        = @"bd_picker_detail";
 NSString * const BDPickerImageClose         = @"bd_picker_close";
-
-
-NSString * const kBDPickerStartNotification = @"kBDPickerStartNotification";

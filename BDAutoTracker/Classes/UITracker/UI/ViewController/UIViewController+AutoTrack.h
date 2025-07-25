@@ -8,9 +8,6 @@
 
 #import <UIKit/UIKit.h>
 
-// hook UIViewcontroller 生命周期的方法
-
-
 NS_ASSUME_NONNULL_BEGIN
 
 @interface UIViewController (AutoTrack)

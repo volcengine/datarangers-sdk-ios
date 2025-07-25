@@ -5,7 +5,6 @@
 //  Created by fengyadong on 2017/9/11.
 //  Copyright 2022 Beijing Volcanoengine Technology Ltd. All Rights Reserved.
 //
-//
 
 #import "BDAutoTrackTimer.h"
 #import <pthread/pthread.h>
@@ -62,7 +61,7 @@
     
     dispatch_time_t timerStartTime = dispatch_time(DISPATCH_TIME_NOW, interval * NSEC_PER_SEC);
     uint64_t timerInterval = interval * NSEC_PER_SEC;
-    uint64_t timerLeeway = NSEC_PER_MSEC; /* timer精度为1毫秒 */
+    uint64_t timerLeeway = NSEC_PER_MSEC; 
     dispatch_source_set_timer(timer,
                               timerStartTime,
                               timerInterval,

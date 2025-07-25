@@ -12,7 +12,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @class BDAutoTrack;
 
-/// event 加工包装
 @interface BDAutoTrackDataCenter : NSObject
 
 @property (nonatomic, assign) BOOL showDebugLog;
@@ -32,6 +31,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)trackProfileEventWithData:(NSDictionary *)data;
 
 - (void)clearDatabase;
+
+- (NSInteger)trackGlobalEventID;
 
 @end
 

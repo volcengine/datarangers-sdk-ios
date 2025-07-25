@@ -13,7 +13,6 @@
 
 + (void)setLaunchFrom:(BDAutoTrackLaunchFrom)from {
     BDAutoTrackLaunchFrom oldFrom = [BDAutoTrackSessionHandler sharedHandler].launchFrom;
-    //TTTrackerLaunchFromUserClick优先级最低，不应该把其他打开方式覆盖(除了初始的状态)
     if (oldFrom != BDAutoTrackLaunchFromInitialState
         && oldFrom != BDAutoTrackLaunchFromUserClick
         && from == BDAutoTrackLaunchFromUserClick) {

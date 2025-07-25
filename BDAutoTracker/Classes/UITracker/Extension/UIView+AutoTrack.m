@@ -13,6 +13,7 @@
 #import "BDTrackConstants.h"
 #import <WebKit/WebKit.h>
 #import "UIViewController+AutoTrack.h"
+#import "BDAutoTrackUtility.h"
 
 
 @implementation UIView (AutoTrack)
@@ -77,8 +78,8 @@
     if (titles.count > 0) {
         [info setValue:titles forKey:kBDAutoTrackEventViewTitle];
     }
-    NSDictionary *extra = [self bdAutoTrackExtraInfos];
-    if ([extra isKindOfClass:[NSDictionary class]] && extra.count > 0) {
+    NSDictionary *extra = bd_deep_copy([self bdAutoTrackExtraInfos]);
+    if (extra && [extra isKindOfClass:[NSDictionary class]] && extra.count > 0) {
         [info setValue:extra forKey:kBDAutoTrackEventDataCustom];
     }
 
@@ -90,9 +91,8 @@
     
     [info setValue:elementType forKey:kBDAutoTrackEventElementType];
     
-    // 自定义属性
-    NSDictionary *properties = [self bdAutoTrackViewProperties];
-    if ([properties isKindOfClass:[NSDictionary class]] && properties.count > 0) {
+    NSDictionary *properties = bd_deep_copy([self bdAutoTrackViewProperties]);
+    if (properties && [properties isKindOfClass:[NSDictionary class]] && properties.count > 0) {
         [info addEntriesFromDictionary:properties];
     }
     

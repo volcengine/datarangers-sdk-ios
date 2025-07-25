@@ -28,17 +28,9 @@ static NSString *const BDPickerMessageName    = @"window.TEAWebviewInfo();";
 - (instancetype)init {
     self = [super init];
     if (self) {
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(pickerStart)
-                                                     name:kBDPickerStartNotification
-                                                   object:nil];
     }
 
     return self;
-}
-
-- (void)pickerStart {
-    self.pickerResult = nil;
 }
 
 - (void)dealloc {
@@ -64,7 +56,6 @@ static NSString *const BDPickerMessageName    = @"window.TEAWebviewInfo();";
                 configuration = configuration ?: [[WKWebViewConfiguration alloc] init];
                 configuration.userContentController = configuration.userContentController ?: [[WKUserContentController alloc] init];
                 
-                // 如果已连接到服务器圈选，则注入生成DOM结构的JS代码
                 if ([[RangersAppLogConfig sharedInstance] isSeversidePickerAvailable]) {
                     WKUserScript *script = [[WKUserScript alloc] initWithSource:bd_picker_pickerJS()
                                                                   injectionTime:(WKUserScriptInjectionTimeAtDocumentEnd)
@@ -77,8 +68,8 @@ static NSString *const BDPickerMessageName    = @"window.TEAWebviewInfo();";
             }
 
             return nil;
-        }); // bd_swizzle_instance_methodWithBlock
-    }); // dispatch_once
+        });
+    });
 }
 
 - (void)setBd_PickerDecorator:(id)object {
@@ -103,16 +94,13 @@ static NSString *const BDPickerMessageName    = @"window.TEAWebviewInfo();";
     return [objc_getAssociatedObject(self, @selector(bd_pickJSInjected)) boolValue];
 }
 
-- (AppLogPickerView *)bd_pickerView {
+- (void)bd_pickerViewStart {
     BDWKWebViewPicker *proxy = [self bd_PickerDecorator];
-    if (proxy.pickerResult) {
-        return proxy.pickerResult;
-    }
     if (!self.bd_pickJSInjected) {
         self.bd_pickJSInjected = YES;
         [self evaluateJavaScript:bd_picker_pickerJS() completionHandler:nil];
     }
-
+    
     BDAutoTrackWeakSelf;
     [self evaluateJavaScript:BDPickerMessageName completionHandler:^(id data, NSError *error) {
         BDAutoTrackStrongSelf;
@@ -134,6 +122,14 @@ static NSString *const BDPickerMessageName    = @"window.TEAWebviewInfo();";
 
         proxy.pickerResult = result;
     }];
+}
+
+- (AppLogPickerView *)bd_pickerView {
+    BDWKWebViewPicker *proxy = [self bd_PickerDecorator];
+    
+    if (proxy.pickerResult) {
+        return proxy.pickerResult;
+    }
 
     return nil;
 }

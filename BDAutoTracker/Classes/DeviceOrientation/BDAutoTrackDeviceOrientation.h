@@ -8,8 +8,6 @@
 
 #import <Foundation/Foundation.h>
 
-
-/// 采集屏幕方向
 @interface BDAutoTrackDeviceOrientation : NSObject
 
 @property (nonatomic, assign) BOOL enabled;

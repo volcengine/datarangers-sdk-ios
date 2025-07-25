@@ -8,9 +8,6 @@
 
 #import <UIKit/UIKit.h>
 
-// hook navigation页面切换相关的方法
-
-
 NS_ASSUME_NONNULL_BEGIN
 
 @interface UINavigationController (AutoTrack)

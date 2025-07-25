@@ -12,7 +12,6 @@
 FOUNDATION_EXTERN NSString * const kBDAutoTrackEventViewID;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackEventViewTitle;
 
-/// 针对tableView collectionView 
 FOUNDATION_EXTERN NSString * const kBDAutoTrackEventViewIndex;
 
 FOUNDATION_EXTERN NSString * const kBDAutoTrackEventElementID;

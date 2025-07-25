@@ -37,8 +37,7 @@ FOUNDATION_EXTERN NSString * const kBDAutoTrackGlobalEventID;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackIsBackground;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackResumeFromBackground;
 
-FOUNDATION_EXTERN NSString * const kBDAutoTrackDeviceID;
-FOUNDATION_EXTERN NSString * const kBDAutoTrackBDDeviceID;
+FOUNDATION_EXTERN NSString * const kBDAutoTrackBDDid;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackCD;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackInstallID;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackSSID;
@@ -69,17 +68,14 @@ FOUNDATION_EXTERN NSString * const kBDAutoTrackResolution;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackTimeZone;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackAccess;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackAPPVersion;
+FOUNDATION_EXTERN NSString * const kBDAutoTrackAPPVersion2;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackAPPBuildVersion;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackPackage;
-FOUNDATION_EXTERN NSString * const kBDAutoTrackCarrier;
-FOUNDATION_EXTERN NSString * const kBDAutoTrackMCCMNC;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackRegion;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackAppRegion;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackTimeZoneName;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackTimeZoneOffSet;
-FOUNDATION_EXTERN NSString * const kBDAutoTrackIdentifierForTracking;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackVendorID;
-FOUNDATION_EXTERN NSString * const kBDAutoTrackIsJailBroken;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackIsUpgradeUser;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackUserAgent;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackServerTime;
@@ -103,7 +99,9 @@ FOUNDATION_EXTERN NSString * const kBDAutoTrackConfigAppTouchPoint;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackConfigAppLanguage;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackConfigAppRegion;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackConfigUserUniqueID;
+FOUNDATION_EXTERN NSString * const kBDAutoTrackConfigUserUniqueIDEncode;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackConfigUserUniqueIDType;
+FOUNDATION_EXTERN NSString * const kBDAutoTrackConfigSSID;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackConfigUserAgent;
 
 FOUNDATION_EXTERN NSString * const kBDAutoTrackRequestHTTPCode;
@@ -122,15 +120,12 @@ FOUNDATION_EXTERN NSString * const kBDAutoTrackIsAPPFirstTimeLaunch;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackLinkType;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackDeepLinkUrl;
 
-// 屏幕方向
 FOUNDATION_EXTERN NSString * const kBDAutoTrackScreenOrientation;
 
-// GPS
 FOUNDATION_EXTERN NSString * const kBDAutoTrackGeoCoordinateSystem;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackLongitude;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackLatitude;
 
-// 时长统计
 FOUNDATION_EXTERN NSString * const kBDAutoTrackEventDuration;
 
 #pragma mark - h5bridge

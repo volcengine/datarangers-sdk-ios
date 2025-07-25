@@ -12,12 +12,13 @@
 #import "BDAutoTrackParamters.h"
 
 #import "BDAutoTrackLocalConfigService.h"
+#import "BDAutoTrackABConfig.h"
 #import "BDAutoTrackRemoteSettingService.h"
+#import "BDAutoTrackRegisterService.h"
 
 #import "BDAutoTrackServiceCenter.h"
 #import "BDAutoTrack.h"
 #import "BDAutoTrackURLHostProvider.h"
-#import "BDAutoTrack+Private.h"
 
 NSMutableDictionary * bd_requestURLParameters(NSString *appID) {
     NSMutableDictionary *result = [NSMutableDictionary new];
@@ -50,8 +51,7 @@ NSMutableDictionary * bd_requestPostHeaderParameters(NSString *appID) {
     NSMutableDictionary *result = [NSMutableDictionary new];
     bd_addBodyNetworkParams(result, appID);
     bd_addSettingParameters(result, appID);
-    [[BDAutoTrack trackWithAppID:appID].identifier solveInstallParameters:result];
-    [[BDAutoTrack trackWithAppID:appID].identifier solveUserParameters:result];
+    bd_registeredAddParameters(result, appID);
 
     return result;
 }

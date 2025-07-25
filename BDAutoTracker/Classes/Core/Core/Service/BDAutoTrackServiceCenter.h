@@ -18,18 +18,15 @@ NS_ASSUME_NONNULL_BEGIN
 
 #pragma mark - commom use
 
-/// will strong hold service
 - (void)registerService:(id<BDAutoTrackService>)service;
 - (void)unregisterService:(id<BDAutoTrackService>)service;
 - (nullable id<BDAutoTrackService>)serviceForName:(NSString *)serviceName appID:(NSString *)appID;
 - (void)unregisterAllServices;
 
-/// for track
 - (nullable NSArray<id<BDAutoTrackService>> *)servicesForName:(NSString *)serviceName;
 
 @end
 
 FOUNDATION_EXTERN id<BDAutoTrackService> _Nullable bd_standardServices(NSString *serviceName, NSString *appID);
-/// specific use
 
 NS_ASSUME_NONNULL_END

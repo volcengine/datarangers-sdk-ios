@@ -17,9 +17,7 @@ IMP bd_swizzle_class_methodWithBlock(Class cls, SEL originalSelector, id block) 
 
     BOOL didAddMethod = class_addMethod(metaClass, originalSelector, newIMP , types);
 
-    /// if supper has but self doesn't have
     if (!didAddMethod) {
-        /// self has method
         class_replaceMethod(metaClass, originalSelector, newIMP, types);
     }
 
@@ -36,7 +34,6 @@ IMP bd_swizzle_instance_methodWithBlock(Class c, SEL origSEL, id block) {
 
     BOOL didAddMethod = class_addMethod(c, origSEL, newIMP, types);
     if (!didAddMethod) {
-        /// self has method
         class_replaceMethod(c, origSEL, newIMP, types);
     }
 
@@ -57,7 +54,6 @@ void bd_swizzle_replace(Class cls, SEL originalSEL, SEL alterSEL, BOOL isClassMe
                         method_getTypeEncoding(alterMethod));
 }
 
-/// 就是给一个类加新方法 不是swizzle
 BOOL bd_swizzle_instance_addMethod(Class target, SEL aSelector, Class source) {
     NSCParameterAssert(aSelector);
     Method origMethod = class_getInstanceMethod(source, aSelector);

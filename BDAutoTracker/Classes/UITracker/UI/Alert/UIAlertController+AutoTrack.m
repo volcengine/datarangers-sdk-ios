@@ -10,6 +10,7 @@
 #import "UIViewController+TrackInfo.h"
 #import "BDTrackConstants.h"
 #import "BDAutoTrackSwizzle.h"
+#import "BDAutoTrackUtility.h"
 
 
 @implementation UIAlertController (AutoTrack)
@@ -22,21 +23,19 @@
         [alertVCInfo setValue:pageID forKey:kBDAutoTrackEventViewID];
     }
 
-    /// alert only
     [alertVCInfo setValue:NSStringFromClass([self class]) forKey:kBDAutoTrackEventAlertVC];
     [alertVCInfo setValue:self.title forKey:kBDAutoTrackEventAlertTitle];
 
     [alertVCInfo setValue:self.message forKey:kBDAutoTrackEventAlertMessage];
     NSString *style = self.preferredStyle == UIAlertControllerStyleAlert ? @"alert" : @"actionSheet";
     [alertVCInfo setValue:style forKey:kBDAutoTrackEventAlertStyle];
-    NSDictionary *extra = [self bdAutoTrackExtraInfos];
-    if ([extra isKindOfClass:[NSDictionary class]] && extra.count > 0) {
+    NSDictionary *extra = bd_deep_copy([self bdAutoTrackExtraInfos]);
+    if (extra && [extra isKindOfClass:[NSDictionary class]] && extra.count > 0) {
         [alertVCInfo setValue:extra forKey:kBDAutoTrackEventDataCustom];
     }
     
-    // 自定义属性
-    NSDictionary *properties = [self bdAutoTrackPageProperties];
-    if ([properties isKindOfClass:[NSDictionary class]] && properties.count > 0) {
+    NSDictionary *properties = bd_deep_copy([self bdAutoTrackPageProperties]);
+    if (properties && [properties isKindOfClass:[NSDictionary class]] && properties.count > 0) {
         [alertVCInfo addEntriesFromDictionary:properties];
     }
 

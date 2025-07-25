@@ -19,15 +19,18 @@
 #import "BDAutoTrack.h"
 #import "BDAutoTrackBatchService.h"
 #import "BDAutoTrackBatchTimer.h"
+#import "BDAutoTrackMainBundle.h"
 
 #if __has_include("BDAutoTrack+UITracker.h")
 #import "BDAutoTrack+UITracker.h"
 #endif
+
+#import "NSDictionary+VETyped.h"
+
 @implementation BDAutoTrack (Private)
 
 @dynamic dataCenter;
 @dynamic showDebugLog;
-@dynamic gameModeEnable;
 @dynamic serialQueue;
 @dynamic alinkActivityContinuation;
 @dynamic profileReporter;
@@ -36,14 +39,30 @@
     return [[BDAutoTrackServiceCenter defaultCenter] servicesForName:BDAutoTrackServiceNameTracker];
 }
 
++ (BDAutoTrack *)trackerWithAppId:(NSString *)appID {
+    NSArray<BDAutoTrack *> *allTracker = [self allTrackers];
+    for (BDAutoTrack *track in allTracker) {
+        if ([track isKindOfClass:[BDAutoTrack class]] && track.appID == appID) {
+            continue;
+        }
+    }
+    return nil;
+}
+
 + (void)trackUIEventWithData:(NSDictionary *)data {
     if (![data isKindOfClass:[NSDictionary class]]) {
+        return;
+    }
+    
+    NSString *className = [[data objectForKey:@"params"] objectForKey:@"page_key"];
+    if ([className hasPrefix:@"BDAutoTrack"]) {
         return;
     }
 
     NSString *event = [data objectForKey:@"event"];
     if (![NSJSONSerialization isValidJSONObject:data]) {
-        RL_WARN(BDAutoTrack.appID, @"[AutoTracker] Event:%@ termimate due to INVALID PARAMETERS.", event);
+        
+        RL_WARN(BDAutoTrack.sharedTrack,@"AutoTrack", @"Event:%@ termimate due to INVALID PARAMETERS.", event);
         return;
     }
     NSArray<BDAutoTrack *> *allTracker = [self allTrackers];
@@ -51,97 +70,126 @@
         if (![track isKindOfClass:[BDAutoTrack class]]) {
             continue;
         }
-        NSString *appID = track.appID;
-        // 全埋点开关，有远端配置和本地代码的配置，两端都开启则开启，有一端关闭则关闭
-        bool autoTrackEnabled = bd_remoteSettingsForAppID(appID).autoTrackEnabled && bd_settingsServiceForAppID(appID).autoTrackEnabled;
-        
-        //判断是否 Igore
-        BOOL ignored = NO;
-        if ([event isEqualToString:@"bav2b_page"]
-            && [track respondsToSelector:@selector(isPageIgnored:)]) {
-            NSString *className = [data objectForKey:@"page_key"];
-            ignored = [track performSelector:@selector(isPageIgnored:) withObject:className];
-        } else if ([event isEqualToString:@"bav2b_click"]
-                   && [track respondsToSelector:@selector(isClickIgnored:)]) {
-            NSString *className = [data objectForKey:@"element_type"];
-            ignored = [track performSelector:@selector(isClickIgnored:) withObject:className];
-        }
-
+        bool autoTrackEnabled = track.remoteConfig.autoTrackEnabled && track.localConfig.autoTrackEnabled;
         if (!autoTrackEnabled) {
-            RL_WARN(track.appID, @"[AutoTracker] Event:%@ termimate due to AUTOTACKER DISABLED.",event);
+            RL_WARN(track,@"AutoTrack", @"Event:%@ termimate due to AUTOTACKER DISABLED", event);
             continue;
         }
         
-        if (ignored) {
-            RL_WARN(track.appID, @"[AutoTracker] Event:%@ termimate due to IGNORED.",event);
-            continue;
+        BDAutoTrackLocalConfigService *settings = track.localConfig;
+        BOOL ignored = NO;
+        if ([event isEqualToString:@"bav2b_page"]) {
+            if (!settings.trackPageEnabled) {
+                continue;
+            }
+            
+            if ([track respondsToSelector:@selector(isPageIgnored:)]) {
+                NSString *className = [[data objectForKey:@"params"] objectForKey:@"page_key"];
+                ignored = [track performSelector:@selector(isPageIgnored:) withObject:className];
+            }
+        } else if ([event isEqualToString:@"bav2b_click"]) {
+            if (!settings.trackPageClickEnabled) {
+                continue;
+            }
+            
+            if ([track respondsToSelector:@selector(isClickIgnored:)]) {
+                NSString *className = [[data objectForKey:@"params"] objectForKey:@"element_type"];
+                ignored = [track performSelector:@selector(isClickIgnored:) withObject:className];
+            }
+        } else if ([event isEqualToString:@"$bav2b_page_leave"]) {
+            if (!settings.trackPageLeaveEnabled) {
+                continue;
+            }
+            
+            if ([track respondsToSelector:@selector(isPageIgnored:)]) {
+                NSString *className = [[data objectForKey:@"params"] objectForKey:@"page_key"];
+                ignored = [track performSelector:@selector(isPageIgnored:) withObject:className];
+            }
         }
-        [track.dataCenter trackUIEventWithData:data];
-    }
-}
 
-+ (void)trackPageLeaveEventWithData:(NSDictionary *)data {
-    NSArray<BDAutoTrack *> *allTracker = [self allTrackers];
-    for (BDAutoTrack *track in allTracker) {
-        if (![track isKindOfClass:[BDAutoTrack class]]) {
+        if (ignored) {
+            RL_WARN(track, @"AutoTrack", @"Event:%@ termimate due to IGNORED.",event);
             continue;
         }
-        BDAutoTrackLocalConfigService *settings = bd_settingsServiceForAppID(track.appID);
-        if (settings.trackPageLeaveEnabled) {
-            [track.dataCenter trackUserEventWithData:data];
+        
+        if (track.config.rollback) {
+            [track.dataCenter trackUIEventWithData:data];
+        } else {
+            [track.eventGenerator trackEventType:BDAutoTrackTableUIEvent eventBody:data options:nil];
         }
+       
     }
 }
 
 + (void)trackLaunchEventWithData:(NSMutableDictionary *)data {
+    if (bd_is_extension()) {
+        return;
+    }
     NSArray<BDAutoTrack *> *allTracker = [self allTrackers];
     for (BDAutoTrack *track in allTracker) {
         if (![track isKindOfClass:[BDAutoTrack class]]) {
             continue;
         }
-        [track.dataCenter trackLaunchEventWithData:[[NSMutableDictionary alloc] initWithDictionary:data copyItems:YES]];
+        if (!track.config.launchTerminateEnable) {
+            continue;
+        }
+        if (track.config.rollback) {
+            [track.dataCenter trackLaunchEventWithData:[[NSMutableDictionary alloc] initWithDictionary:data copyItems:YES]];
+        } else {
+            [track.eventGenerator trackLaunch:data];
+        }
+        
+        if([data vetyped_boolForKey:kBDAutoTrackIsBackground]) {
+            bool resumeFromBackground = [data vetyped_boolForKey:kBDAutoTrackResumeFromBackground];
+            if (track.config.rollback) {
+                NSDictionary *trackData = @{kBDAutoTrackEventType:@"$app_launch_passively",
+                                            kBDAutoTrackEventData:@{kBDAutoTrackResumeFromBackground: @(resumeFromBackground)}};
+                [track.dataCenter trackUserEventWithData:trackData];
+            } else {
+                [track.eventGenerator trackEvent:@"$app_launch_passively" parameter:@{kBDAutoTrackResumeFromBackground: @(resumeFromBackground)} options:nil];
+            }
+        }
     }
 }
 
 + (void)trackTerminateEventWithData:(NSMutableDictionary *)data {
-    NSArray<BDAutoTrack *> *allTracker = [self allTrackers];
-    for (BDAutoTrack *track in allTracker) {
-        if (![track isKindOfClass:[BDAutoTrack class]]) {
-            continue;
-        }
-        [track.dataCenter trackTerminateEventWithData:[[NSMutableDictionary alloc] initWithDictionary:data copyItems:YES]];
+    if (bd_is_extension()) {
+        return;
     }
-}
-
-+ (void)trackPlaySessionEventWithData:(NSDictionary *)data {
+    
     NSArray<BDAutoTrack *> *allTracker = [self allTrackers];
     for (BDAutoTrack *track in allTracker) {
         if (![track isKindOfClass:[BDAutoTrack class]]) {
             continue;
         }
-        if (track.gameModeEnable) {
-            [track.dataCenter trackUserEventWithData:data];
+        if (!track.config.launchTerminateEnable) {
+            continue;
+        }
+        if (track.config.rollback) {
+            [track.dataCenter trackTerminateEventWithData:[[NSMutableDictionary alloc] initWithDictionary:data copyItems:YES]];
+        } else {
+            [track.eventGenerator trackTerminate:data];
         }
     }
 }
 
 - (void)setAppTouchPoint:(NSString *)appTouchPoint {
-    NSString *appID = self.appID;
     dispatch_async(self.serialQueue, ^{
-        [bd_settingsServiceForAppID(appID) saveAppTouchPoint:[appTouchPoint mutableCopy]];
+        [self.localConfig saveAppTouchPoint:[appTouchPoint copy]];
     });
 }
 
-/// caller: Profile上报、Tracer上报
-/// 若上次上报时间在flushTimeInterval内，立即发起一次Batch上报。
-/// 传入timeInterval=0，可实现立即上报.
-/// @param flushTimeInterval Flush上报的最小间隔，整数。单位：秒。
 - (void)flushWithTimeInterval:(NSInteger)flushTimeInterval {
     NSString *appID = self.appID;
     dispatch_async(self.serialQueue, ^{
         BDAutoTrackBatchService *service = (BDAutoTrackBatchService *)bd_standardServices(BDAutoTrackServiceNameBatch, appID);
         [service sendTrackDataFrom:BDAutoTrackTriggerSourceManually flushTimeInterval:flushTimeInterval];
     });
+}
+
+- (NSString *)description
+{
+    return [NSString stringWithFormat:@"%@-%@", self.config.appID, self.config.appName];
 }
 
 

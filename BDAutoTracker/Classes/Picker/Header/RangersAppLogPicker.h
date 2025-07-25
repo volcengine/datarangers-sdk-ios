@@ -10,4 +10,4 @@
 #define RangersAppLogPicker_h
 
 
-#endif /* RangersAppLogPicker_h */
+#endif 

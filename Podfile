@@ -12,21 +12,15 @@ target 'Example' do
   use_frameworks!
 
   # Pods for Example
-pod 'RangersAppLog', #'5.6.9-rc.10',
+pod 'RangersAppLog',
     :path => './',
     :subspecs => [
-      'Host/SG',
-      'Host/VA',
-      'Host/CN',
       'Core',
       'Log',
       'Picker',
       'UITracker',
-      'CBridge',
       'DeviceOrientation',
-      'Exposure',
-      'VEInstall',
-      'IDFA'
+      'Exposure'
     ],
     :testspecs => [
       'Tests',

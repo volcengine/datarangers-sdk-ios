@@ -16,7 +16,10 @@ NSString * const kBDAutoTrackSwitchIsBack               = @"kBDAutoTrackSwitchIs
 
 NSString * const BDAutoTrackNotificationRegisterSuccess     = @"BDAutoTrackRegisterSuccess";
 NSString * const BDAutoTrackNotificationRegisterFailure     = @"BDAutoTrackRegisterFailure";
+NSString * const BDAutoTrackNotificationActiveSuccess       = @"BDAutoTrackActiveSuccess";
 NSString * const BDAutoTrackNotificationABTestSuccess       = @"BDAutoTrackABTestSuccess";
+
+NSString * const BDAutoTrackRemoteConfigDidUpdateNotification  = @"BDAutoTrackRemoteConfigDidUpdateNotification";
 
 NSString * const kBDAutoTrackNotificationAppID              = @"AppID";
 NSString * const kBDAutoTrackNotificationRangersDeviceID    = @"RangersDeviceID";

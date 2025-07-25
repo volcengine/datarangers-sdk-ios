@@ -10,12 +10,6 @@
 #import "BDAutoTrackUtility.h"
 #import "BDAutoTrackDefaults.h"
 
-/// 正常情况下1分钟1条， 2分钟内限制10条（切后台可能上报比较多一点）
-/// 如果服务端返回5xx后，每个间隔1条，1分钟 -> 2分钟 -> 4分钟 -> 8分钟 -> 16分钟
-/// 最大间隔就16分钟，不会降级到32分钟
-/// 如果返回200后,时间间隔先恢复，8分钟 -> 4分钟 -> 2分钟
-/// 2分钟之内最多发1条->2条->3条->，这样慢速增长
-
 static const NSTimeInterval    kDefaultScheduleInterval     = 60;
 static const NSTimeInterval    kBatchSendingIntervalMax = 16 * 60;
 
@@ -29,8 +23,8 @@ static NSString *const kAppLogDescendInterval = @"kAppLogDescendInterval";
 @interface BDAutoTrackBatchSchedule ()
 
 @property (nonatomic, assign) NSTimeInterval modifyTimeStamp;
-@property (nonatomic, assign) NSInteger sendingTimes;       /// 接口已经发送的次数
-@property (nonatomic, assign) NSInteger maxTSendingTimes;   /// 接口interval内最大可发送的次数
+@property (nonatomic, assign) NSInteger sendingTimes;
+@property (nonatomic, assign) NSInteger maxTSendingTimes;   
 @property (nonatomic, assign) NSInteger successCount;
 @property (nonatomic, copy) NSString *appID;
 @end

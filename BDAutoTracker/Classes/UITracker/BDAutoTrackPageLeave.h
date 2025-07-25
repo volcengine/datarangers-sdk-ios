@@ -15,11 +15,9 @@
 
 + (instancetype)shared;
 
-- (void)updateEnabled:(BOOL)enabled;
-
 - (void)enterPage:(UIViewController *)vc;
 
-- (void)leavePage:(UIViewController *)vc;
+- (NSDictionary *)leavePage:(UIViewController *)vc;
 
 
 @end

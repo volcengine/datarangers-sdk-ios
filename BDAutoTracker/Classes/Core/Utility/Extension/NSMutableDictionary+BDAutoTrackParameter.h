@@ -12,9 +12,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface NSMutableDictionary (BDAutoTrackParameter)
 
-//转换非法Key
-// e.g.
-//$user_unique_id_type => user_unique_id_type
 - (void)bdheader_keyFormat;
 
 @end

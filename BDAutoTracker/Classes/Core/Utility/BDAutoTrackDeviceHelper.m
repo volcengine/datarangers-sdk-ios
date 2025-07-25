@@ -26,24 +26,6 @@
 #include <arpa/inet.h>
 #include <net/if.h>
 
-BOOL bd_device_isJailBroken() {
-    static BOOL tt_is_jailBroken = NO;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        NSString *filePath = ral_base64_string(@"L0FwcGxpY2F0aW9ucy9DeWRpYS5hcHA=");
-        if ([[NSFileManager defaultManager] fileExistsAtPath:filePath]) {
-            tt_is_jailBroken = YES;
-        }
-
-        filePath = ral_base64_string(@"L3ByaXZhdGUvdmFyL2xpYi9hcHQ=");
-        if ([[NSFileManager defaultManager] fileExistsAtPath:filePath]) {
-            tt_is_jailBroken = YES;
-        }
-    });
-
-    return tt_is_jailBroken;
-}
-
 NSString * bd_device_platformName() {
     static NSString *result = nil;
     static dispatch_once_t onceToken;
@@ -127,6 +109,41 @@ uint32_t bd_device_cpuCoreCount() {
     return ncpu;
 }
 
+NSString * bd_device_cpuType() {
+    NSMutableString *cpu = [[NSMutableString alloc] init];
+    size_t size;
+    cpu_type_t type;
+    cpu_subtype_t subtype;
+    size = sizeof(type);
+    sysctlbyname("hw.cputype", &type, &size, NULL, 0);
+
+    size = sizeof(subtype);
+    sysctlbyname("hw.cpusubtype", &subtype, &size, NULL, 0);
+
+    if (type == CPU_TYPE_X86_64) {
+        [cpu appendString:@"x86_64"];
+    } else if (type == CPU_TYPE_X86) {
+        [cpu appendString:@"x86"];
+    } else if (type == CPU_TYPE_ARM) {
+        [cpu appendString:@"ARM"];
+        switch(subtype) {
+            case CPU_SUBTYPE_ARM_V6:
+                [cpu appendString:@"V6"];
+                break;
+            case CPU_SUBTYPE_ARM_V7:
+                [cpu appendString:@"V7"];
+                break;
+            case CPU_SUBTYPE_ARM_V8:
+                [cpu appendString:@"V8"];
+                break;
+            default:
+                [cpu appendString:@""];
+                break;
+        }
+    }
+    return cpu;
+}
+
 
 u_int64_t bd_device_totalDiskSpace() {
     NSError *error = nil;
@@ -190,16 +207,32 @@ NSString * bd_device_resolutionString() {
     return [NSString stringWithFormat:@"%d*%d", (int)resolution.width, (int)resolution.height];
 }
 
-/// 系统语言
-/// preferredLanguages包含 NSLocaleLanguageCode - NSLocaleScriptCode - NSLocaleCountryCode
+#if TARGET_OS_IOS
+NSString * bd_device_IDFV() {
+    static NSString *IDFVString = nil;
+    static dispatch_once_t onceToken;
+    if ([NSThread isMainThread]) {
+        if (IDFVString == nil) {
+            IDFVString = [UIDevice currentDevice].identifierForVendor.UUIDString;
+        }
+    } else {
+        dispatch_once(&onceToken, ^{
+            dispatch_sync(dispatch_get_main_queue(), ^{
+                IDFVString = [UIDevice currentDevice].identifierForVendor.UUIDString;
+            });
+        });
+    }
+
+    return IDFVString;
+}
+#endif
+
 NSString * bd_device_currentSystemLanguage() {
     NSString *localeIdentifier = [[NSLocale preferredLanguages] firstObject];
     NSDictionary *languageDic = [NSLocale componentsFromLocaleIdentifier:localeIdentifier];
     return [languageDic objectForKey:NSLocaleLanguageCode];
 }
 
-/// NSLocaleLanguageCode 并非系统 Language，而是工程配置中的App当前语言
-/// currentLocale在一次App启动中不变 autoupdatingCurrentLocale在用户更改settings的时候会改变
 NSString *bd_device_currentLanguage() {
     return [[NSLocale currentLocale] objectForKey:NSLocaleLanguageCode];
 }
@@ -264,4 +297,3 @@ NSString *bd_device_sku() {
 }
 
 #endif
-

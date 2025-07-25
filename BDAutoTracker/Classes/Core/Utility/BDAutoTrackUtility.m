@@ -7,6 +7,7 @@
 //
 
 #import "BDAutoTrackUtility.h"
+#import <CommonCrypto/CommonCrypto.h>
 #import <CommonCrypto/CommonDigest.h>
 
 NSString *ral_base64_string(NSString *base64) {
@@ -48,16 +49,6 @@ NSString * bd_UUID() {
     return uuidStr;
 }
 
-/**
- NSTimeInterval startTime = [[NSDate date] timeIntervalSince1970];
- 等同于
- NSDateFormatter *formatter = [[NSDateFormatter alloc] init] ;
- [formatter setDateFormat:@"yyyy-MM-dd HH:mm:ss"];
- NSDate *date= [formatter dateFromString:@"2001-01-01 00.00.00"];
- NSTimeInterval startTime = CFAbsoluteTimeGetCurrent() + [date timeIntervalSince1970] + [NSTimeZone systemTimeZone].secondsFromGMT;
- 不等同于
- CFTimeInterval ss = CACurrentMediaTime();
-*/
 NSNumber *bd_currentInterval() {
     NSTimeInterval nowInterval = [[NSDate date] timeIntervalSince1970];
     return [NSNumber numberWithDouble:nowInterval];
@@ -81,7 +72,19 @@ NSString *bd_dateNowString() {
     } @finally {
 
     }
+    return result;
+}
 
+NSString *bd_formatDateString(NSTimeInterval time)
+{
+    NSString *result = nil;
+    @try {
+        result = [bd_dateFormatter() stringFromDate:[NSDate dateWithTimeIntervalSince1970:time]];
+    } @catch (NSException *exception) {
+        result = @"2013-1-15 12:00:00";
+    } @finally {
+
+    }
     return result;
 }
 
@@ -105,8 +108,6 @@ NSCharacterSet *bd_customQueryAllowedCharacters(void) {
     dispatch_once(&onceToken, ^{
         NSMutableCharacterSet *set = [NSMutableCharacterSet new];
         [set formUnionWithCharacterSet:[NSCharacterSet alphanumericCharacterSet]];
-        // [set addCharactersInString:@"$-_.+!*'(),"];
-        // Why '+' should be percent-encoded? see https://stackoverflow.com/questions/6855624/plus-sign-in-query-string
         [set addCharactersInString:@"-_."];
         turing_set = set;
     });
@@ -173,7 +174,6 @@ NSString *bd_trackerLibraryPath() {
         path = [sandboxLibrary stringByAppendingPathComponent:@"._tob_applog_docu"];  // hidden directory
         NSFileManager *fm = [NSFileManager defaultManager];
         
-        /* delete possible folder in document directory */
         {
             NSString *sandboxDocuement = bd_sandBoxDocumentsPath();
             for (NSString *path in @[
@@ -195,7 +195,6 @@ NSString *bd_trackerLibraryPath() {
         } else {
             [fm createDirectoryAtPath:path withIntermediateDirectories:YES attributes:nil error:nil];
         }
-         /// 耗时操作
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             NSURL *url = [NSURL fileURLWithPath:path];
             [url setResourceValue:[NSNumber numberWithBool:YES] forKey:NSURLIsExcludedFromBackupKey error:nil];
@@ -223,8 +222,6 @@ NSString *bd_trackerLibraryPathForAppID(NSString *appID) {
 }
 
 #pragma mark - 序列化
-/// 返回提供JSON Dictionary的真深拷贝
-/// @param params 可序列化为JSON的Dictionary
 NSDictionary *bd_trueDeepCopyOfDictionary(NSDictionary *params) {
 #ifdef DEBUG
     struct TDCDebug {
@@ -243,14 +240,11 @@ NSDictionary *bd_trueDeepCopyOfDictionary(NSDictionary *params) {
     NSError *err;
     NSData *paramsData = [NSJSONSerialization dataWithJSONObject:params options:0 error:&err];
     result = [NSJSONSerialization JSONObjectWithData:paramsData options:0 error:&err];
+    
     return result;
 }
 
 #pragma mark - JSON helpers
-/// 获得JSON对象的String表示。PrettyPrint & UTF-8
-/// 如果不是有效的JSON对象则返回nil
-/// 目前仅在输出Debug Log时被用到
-/// @param param JSON对象
 NSString *bd_JSONRepresentation(id param) {
     if (!param || ![NSJSONSerialization isValidJSONObject:param]) {
         return nil;
@@ -306,8 +300,6 @@ id bd_JSONValueForString(NSString *inJSON) {
     return object;
 }
 
-/// 计算字符串md5
-/// @param cStr C字符串
 NSString * bd_calc_md5(const char *cStr) {
     unsigned char result[CC_MD5_DIGEST_LENGTH];
     CC_MD5( cStr, (CC_LONG)strlen(cStr), result);
@@ -343,4 +335,149 @@ NSCharacterSet *bd_URLAllowedCharacters(void) {
     });
 
     return set;
+}
+
+void bd_run_in_main_thread(dispatch_block_t block) {
+    if ([NSThread isMainThread]) {
+        block();
+    } else {
+        dispatch_async(dispatch_get_main_queue(), block);
+    }
+}
+
+void bd_run_in_main_thread_sync(dispatch_block_t block) {
+    if ([NSThread isMainThread]) {
+        block();
+    } else {
+        dispatch_sync(dispatch_get_main_queue(), block);
+    }
+}
+
+id _Nullable bd_deep_copy(id _Nullable object) {
+    @try {
+        if (!object) {
+            return nil;
+        }
+        NSData *data;
+        if (@available(iOS 11.0, *)) {
+            data = [NSKeyedArchiver archivedDataWithRootObject:object requiringSecureCoding:NO error:nil];
+        } else {
+            // Fallback on earlier versions
+            data = [NSKeyedArchiver archivedDataWithRootObject:object];
+        }
+        
+        id object;
+        if (@available(iOS 11.0, *)) {
+            object =  [NSKeyedUnarchiver unarchivedObjectOfClasses:@[[NSDictionary class], [NSArray class]] fromData:data error:nil];
+        } else {
+            // Fallback on earlier versions
+            object = [NSKeyedUnarchiver unarchiveObjectWithData:data];
+        }
+        return object;
+    } @catch (NSException *exception) {
+        return nil;
+    }
+}
+
+#pragma des 加解密
+NSString * bd_ecs_encode(NSString *inputStr, NSString *key, NSError **error) {
+    if (!inputStr || inputStr.length < 1) {
+        return inputStr;
+    }
+    
+    NSData *inputData = [inputStr dataUsingEncoding:NSUTF8StringEncoding];
+    NSData *keyData = [key dataUsingEncoding:NSASCIIStringEncoding];
+    if (keyData.length != kCCKeySize3DES) {
+        if (error != NULL) {
+            *error = [NSError errorWithDomain:@"BDAutoTrackECSEncode" code:0 userInfo:@{
+                NSLocalizedDescriptionKey: [NSString stringWithFormat:@"key length should be %d", kCCKeySize3DES]
+            }];
+        }
+        return nil;
+    }
+    
+    size_t length;
+    NSMutableData *outputData = [NSMutableData dataWithLength:(inputData.length + keyData.length)];
+    CCCryptorStatus status = CCCrypt(kCCEncrypt,
+                                     kCCAlgorithm3DES,
+                                     kCCOptionPKCS7Padding, // options
+                                     keyData.bytes,
+                                     keyData.length,
+                                     nil, // iv
+                                     inputData.bytes,
+                                     inputData.length,
+                                     outputData.mutableBytes,
+                                     outputData.length,
+                                     &length);
+    if (status != kCCSuccess) {
+        if (error != NULL) {
+            *error = [NSError errorWithDomain:@"BDAutoTrackECSEncode" code:status userInfo:@{
+                NSLocalizedDescriptionKey: [NSString stringWithFormat:@"encode failed, status: %d", status]
+            }];
+        }
+        return nil;
+    }
+    
+    NSString *outputStr;
+    [outputData setLength:length];
+    outputStr = [outputData base64EncodedStringWithOptions:0];
+    
+    return outputStr;
+}
+
+NSString * bd_ecs_decode(NSString *encodeStr, NSString *key, NSError **error) {
+    if (!encodeStr || encodeStr.length < 1) {
+        return encodeStr;
+    }
+    
+    NSData *encodeData;
+    @try {
+        NSData *encodeBase64Data = [encodeStr dataUsingEncoding:NSUTF8StringEncoding];
+        encodeData = [[NSData alloc] initWithBase64EncodedData:encodeBase64Data options:0];
+    } @catch (NSException *exception) {
+        if (error != NULL) {
+            *error = [NSError errorWithDomain:@"BDAutoTrackECSDecode" code:0 userInfo:@{
+                NSLocalizedDescriptionKey: [NSString stringWithFormat:@"encodeStr should be base64 string: %@", encodeStr]
+            }];
+        }
+        return nil;
+    }
+    
+    NSData *keyData = [key dataUsingEncoding:NSASCIIStringEncoding];
+    if (keyData.length != kCCKeySize3DES) {
+        if (error != NULL) {
+            *error = [NSError errorWithDomain:@"BDAutoTrackECSDecode" code:0 userInfo:@{
+                NSLocalizedDescriptionKey: [NSString stringWithFormat:@"key length should be %d", kCCKeySize3DES]
+            }];
+        }
+        return nil;
+    }
+    
+    size_t length;
+    NSMutableData *outputData = [NSMutableData dataWithLength:(encodeData.length + keyData.length)];
+    CCCryptorStatus status = CCCrypt(kCCDecrypt,
+                                     kCCAlgorithm3DES,
+                                     kCCOptionPKCS7Padding, // options
+                                     keyData.bytes,
+                                     keyData.length,
+                                     nil, // iv
+                                     encodeData.bytes,
+                                     encodeData.length,
+                                     outputData.mutableBytes,
+                                     outputData.length,
+                                     &length);
+    if (status != kCCSuccess) {
+        if (error != NULL) {
+            *error = [NSError errorWithDomain:@"BDAutoTrackECSEncode" code:status userInfo:@{
+                NSLocalizedDescriptionKey: [NSString stringWithFormat:@"decode failed, status: %d", status]
+            }];
+        }
+        return nil;
+    }
+    
+    NSString *outputStr;
+    [outputData setLength:length];
+    outputStr = [[NSString alloc] initWithData:outputData encoding:NSUTF8StringEncoding];
+    
+    return outputStr;
 }

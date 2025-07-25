@@ -24,7 +24,6 @@
     dispatch_block_t action = ^{
         index++;
         XCTAssertLessThan(index, 7);
-        /// should cancel it to release the action
         if (index == 6) {
             [[BDAutoTrackTimer sharedInstance] cancelTimerWithName:@"Repeat"];
         }
@@ -35,7 +34,6 @@
                                                                 queue:nil
                                                               repeats:YES
                                                                action:action];
-    /// timeout should be inside a interval
     CFTimeInterval timeout = expectation.expectedFulfillmentCount * interval;
     [self waitForExpectations:@[expectation] timeout:timeout + 0.3];
 }

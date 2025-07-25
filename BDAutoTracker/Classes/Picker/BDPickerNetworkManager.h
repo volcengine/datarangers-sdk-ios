@@ -8,7 +8,6 @@
 
 #import <Foundation/Foundation.h>
 #import "BDCommonEnumDefine.h"
-/// 网络请求
 
 NS_ASSUME_NONNULL_BEGIN
 

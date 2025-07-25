@@ -15,6 +15,7 @@
 #import "BDAutoTrackRemoteSettingService.h"
 #import "BDAutoTrackLocalConfigService.h"
 #import "BDAutoTrackBatchService.h"
+#import "BDAutoTrack+Private.h"
 
 static NSString *const kBDAutoTrackBatchRequestTimer    = @"kBDAutoTrackBatchRequestTimer";
 
@@ -92,6 +93,11 @@ static NSString *const kBDAutoTrackBatchRequestTimer    = @"kBDAutoTrackBatchReq
                                                      name:BDAutoTrackNotificationRegisterSuccess
                                                    object:nil];
         
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(onActiveFinish:)
+                                                     name:BDAutoTrackNotificationActiveSuccess
+                                                   object:nil];
+        
         
     }
     
@@ -109,13 +115,8 @@ static NSString *const kBDAutoTrackBatchRequestTimer    = @"kBDAutoTrackBatchReq
     if (![appID isEqualToString:self.appID]) {
         return;
     }
-    /// 不自动激活的，注册成功则需要发送日志
-    
-    [self onDidBecomeActive];
-
 }
 
-/// 激活成功时上报
 - (void)onDidBecomeActive {
     if (!self.didBecomeActive) {
         self.didBecomeActive = YES;
@@ -123,7 +124,6 @@ static NSString *const kBDAutoTrackBatchRequestTimer    = @"kBDAutoTrackBatchReq
         if (self.skipLaunch) {
             return;
         }
-        /// delay 0.1s
         BDAutoTrackWeakSelf;
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
             BDAutoTrackStrongSelf;
@@ -137,12 +137,10 @@ static NSString *const kBDAutoTrackBatchRequestTimer    = @"kBDAutoTrackBatchReq
     }
 }
 
-/// 进入前台时，延迟1s上报
 - (void)onWillEnterForeground {
     if (self.skipLaunch) {
         return;
     }
-    /// delay 1s
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         if ([self.request respondsToSelector:@selector(sendTrackDataFrom:)]) {
             [self.request sendTrackDataFrom:BDAutoTrackTriggerSourceEnterForground];
@@ -150,7 +148,6 @@ static NSString *const kBDAutoTrackBatchRequestTimer    = @"kBDAutoTrackBatchReq
     });
 }
 
-/// 进入后台后，向系统注册后台任务，并从后台上报
 - (void)onDidEnterBackground {
     
 #if TARGET_OS_IOS
@@ -168,7 +165,6 @@ static NSString *const kBDAutoTrackBatchRequestTimer    = @"kBDAutoTrackBatchReq
                    dispatch_get_main_queue(),
                    action);
 
-    /// after 0.1s
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         BDAutoTrackStrongSelf;
         if (self.isTerminating) {
@@ -209,7 +205,6 @@ static NSString *const kBDAutoTrackBatchRequestTimer    = @"kBDAutoTrackBatchReq
     [self startTimer];
 }
 
-/// 定时上报
 - (void)startTimer {
     BDAutoTrackWeakSelf;
     dispatch_block_t action = ^{

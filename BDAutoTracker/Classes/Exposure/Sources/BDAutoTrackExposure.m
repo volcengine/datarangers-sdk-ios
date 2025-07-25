@@ -61,7 +61,11 @@
 
 @property (nonatomic, assign) CGFloat areaRatio;
 
+@property (nonatomic, assign) NSInteger stayTriggerTime;
+
 @property (nonatomic, copy) NSNumber *visualDiagnosisVal;
+
+@property (nonatomic, copy) BDAutoTrackExposureBlock exposureBlock;
 
 @end
 
@@ -71,6 +75,7 @@
 {
     BDViewExposureConfig * config = [BDViewExposureConfig new];
     config.areaRatio = -1;
+    config.stayTriggerTime = -1;
     return config;
 }
 
@@ -79,6 +84,7 @@
     BDViewExposureConfig * config = [BDViewExposureConfig new];
     [config enableVisualDiagnosis:NO];
     [config areaRatio:0];
+    [config stayTriggerTime:0];
     return config;
 }
 
@@ -94,6 +100,18 @@
     return self;
 }
 
+- (instancetype)stayTriggerTime:(NSInteger)timestamp
+{
+    self.stayTriggerTime = timestamp;
+    return self;
+}
+
+- (instancetype)exposureBlock:(nullable BDAutoTrackExposureBlock)block
+{
+    self.exposureBlock = block;
+    return self;
+}
+
 - (BOOL)visualDiagnosisEnabled;
 {
     return [self.visualDiagnosisVal boolValue];
@@ -106,6 +124,12 @@
     }
     if (!self.visualDiagnosisVal) {
         self.visualDiagnosisVal = global.visualDiagnosisVal;
+    }
+    if (self.stayTriggerTime < 0) {
+        self.stayTriggerTime = global.stayTriggerTime;
+    }
+    if (!self.exposureBlock) {
+        self.exposureBlock = global.exposureBlock;
     }
 }
 

@@ -11,9 +11,9 @@
 NS_ASSUME_NONNULL_BEGIN
 
 typedef NS_ENUM(NSInteger, VEAESKeySize) {
-    VEAESKeySizeAES128 = 0x10, /// 对应key的byte是16字节
-    VEAESKeySizeAES192 = 0x18, /// 对应key的byte是24字节
-    VEAESKeySizeAES256 = 0x20, /// 对应key的byte是32字节
+    VEAESKeySizeAES128 = 0x10,
+    VEAESKeySizeAES192 = 0x18,
+    VEAESKeySizeAES256 = 0x20, 
 };
 
 @interface NSData (VECryptor)

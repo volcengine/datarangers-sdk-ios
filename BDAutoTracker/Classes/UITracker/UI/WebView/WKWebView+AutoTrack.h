@@ -12,7 +12,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface WKWebView (AutoTrack)
 
-/// SDK初始化时调用
 + (void)swizzleForH5AutoTrack;
 
 @end

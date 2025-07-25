@@ -8,14 +8,12 @@
 
 #import "BDAutoTrackEnviroment.h"
 #import "BDAutoTrackReachability.h"
-#import "BDAutoTrackCellular.h"
+#import "BDAutoTrack+Private.h"
+#import "BDTrackerCoreConstants.h"
 
 @implementation BDAutoTrackEnviroment {
+    
     BDAutoTrackReachability *reachability;
-
-#if TARGET_OS_IOS
-    BDAutoTrackCellular *celluar;
-#endif
     
     BOOL running;
     
@@ -35,14 +33,21 @@
 {
     if (self = [super init]) {
         reachability = [BDAutoTrackReachability reachability];
-#if TARGET_OS_IOS
-        celluar = [BDAutoTrackCellular sharedInstance];
-#endif
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(onDidEnterBackground) name:UIApplicationDidEnterBackgroundNotification
                                                    object:nil];
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(onWillEnterForeground) name:UIApplicationWillEnterForegroundNotification
+                                                   object:nil];
+        
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(onWillEnterForeground) name:UIApplicationWillEnterForegroundNotification
+                                                   object:nil];
+        
+        
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(onNetworkChanged)
+                                                     name:BDAutoTrackReachabilityDidChangeNotification
                                                    object:nil];
         
     }
@@ -52,11 +57,6 @@
 - (BDAutoTrackReachability *)reachability
 {
     return reachability;
-}
-
-- (id)carrier
-{
-    return celluar.carrier;
 }
 
 - (NSString *)connectionTypeName
@@ -101,12 +101,17 @@
             conType = BDAutoTrackConnectionTypeWiFi;
             break;
         case BDAutoTrackReachabilityStatusReachableViaWWAN:
-#if TARGET_OS_IOS
-            conType = [celluar connectionType];
-#endif
+            conType = BDAutoTrackConnectionTypeMobile;
             break;
     }
     return conType;
+}
+
+- (void)onNetworkChanged
+{
+    [[BDAutoTrack allTrackers] enumerateObjectsUsingBlock:^(BDAutoTrack * _Nonnull tracker, NSUInteger idx, BOOL * _Nonnull stop) {
+        [tracker.eventGenerator addEventParameter:@{kBDAutoTrackEventNetWork:@([self connectionType])}];
+    }];
 }
 
 - (BOOL)isNetworkConnected
@@ -118,6 +123,7 @@
 - (void)startTrack
 {
     [self resume];
+    [self onNetworkChanged];
 }
 
 - (void)resume

@@ -10,11 +10,8 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-// path: [BDAutoTrackUtility trackerDocumentPath]/{$appid}/config.plist
-
 @interface BDAutoTrackDefaults_Fallback : NSObject
 
-/// for sepecific use like database
 - (instancetype)initWithAppID:(NSString *)appID name:(NSString *)name;
 
 - (NSObject *)objectForKey:(NSString *)key;

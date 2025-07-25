@@ -10,8 +10,8 @@
 #import "BDAutoTrackLoginRequest.h"
 #import "BDAutoTrackSchemeHandler+Internal.h"
 #import "BDAutoTrackSimulatorService.h"
-#import "BDToast.h"
 #import "RangersAppLogConfig.h"
+#import "BDAutoTrackUI.h"
 
 __attribute__((constructor)) void bdauto_picker_sync_handler(void) {
     [[BDAutoTrackSchemeHandler sharedHandler] registerInternalHandler:[BDPickerSchemeSyncHandler new]];
@@ -40,12 +40,14 @@ __attribute__((constructor)) void bdauto_picker_sync_handler(void) {
                   scene:(id)scene {
     BDAutoTrackLoginRequest *request = [[BDAutoTrackLoginRequest alloc] initWithAppID:appID];
     request.successCallback = ^{
-        bd_picker_toastShow( @"Start uploading dom！");
+        [BDAutoTrackUI toast:@"Picker is avalible"];
         BDAutoTrackSimulatorService *service = [[BDAutoTrackSimulatorService alloc] initWithAppID:appID];
         [service registerService];
         
-        // 成功登录。把「已连接上服务端圈选」的标记记为True。
         [[RangersAppLogConfig sharedInstance] setSeversidePickerAvailable:YES];
+    };
+    request.failureCallback = ^{
+        [BDAutoTrackUI toast:@"Picker login failure"];
     };
     request.qr = qr;
     [request startRequestWithRetry:0];

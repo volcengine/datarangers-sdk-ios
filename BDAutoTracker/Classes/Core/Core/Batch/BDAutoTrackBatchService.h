@@ -10,15 +10,13 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/*!
- 批量上报
- 网络接口: 同步
- */
 @interface BDAutoTrackBatchService : BDAutoTrackService
 
 - (instancetype)initWithAppID:(NSString *)appID;
 - (void)sendTrackDataFrom:(NSInteger)from;
 - (void)sendTrackDataFrom:(NSInteger)from flushTimeInterval:(NSInteger)flushTimeInterval;
+
+- (void)realtimeEventBatch;
 
 + (BOOL)syncBatch:(id)tracker withEvents:(NSArray *)events;
 

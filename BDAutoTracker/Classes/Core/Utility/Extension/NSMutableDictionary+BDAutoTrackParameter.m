@@ -28,9 +28,6 @@
     [allkeys enumerateObjectsUsingBlock:^(NSString * _Nonnull headerKey, NSUInteger idx, BOOL * _Nonnull stop) {
         if ([headerKey hasPrefix:@"$"]) {
             NSString *formatedKey = [headerKey stringByReplacingCharactersInRange:NSMakeRange(0, 1) withString:@""];
-            if ([self.allKeys containsObject:formatedKey]) {
-                return;
-            }
             id v = [self valueForKey:headerKey];
             [self setValue:v forKey:formatedKey];
             [self removeObjectForKey:headerKey];

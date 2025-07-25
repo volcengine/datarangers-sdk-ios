@@ -22,4 +22,4 @@ FOUNDATION_EXTERN BDAutoTrackTable BDAutoTrackTableExtraEvent;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackTableColumnTrackID;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackTableColumnEntireLog;
 
-#endif /* BDAutoTrackTableConstants_h */
+#endif 

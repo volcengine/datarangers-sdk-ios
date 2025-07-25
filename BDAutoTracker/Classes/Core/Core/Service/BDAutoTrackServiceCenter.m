@@ -14,7 +14,6 @@
 
 @interface BDAutoTrackServiceCenter ()
 
-/// appid {serviceName:service}
 @property (nonatomic, strong) NSMutableDictionary<NSString * ,NSMutableDictionary<NSString *, id<BDAutoTrackService>> *> *services;
 @property (nonatomic, strong) dispatch_semaphore_t semaphore;
 

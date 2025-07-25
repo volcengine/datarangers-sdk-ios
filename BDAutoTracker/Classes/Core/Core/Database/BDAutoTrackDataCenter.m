@@ -15,13 +15,14 @@
 #import "BDAutoTrackDefaults.h"
 #import "BDAutoTrackServiceCenter.h"
 #import "RangersLog.h"
-#import "BDAutoTrackABTest.h"
+#import "BDAutoTrackABConfig.h"
 #import "BDAutoTrackLocalConfigService.h"
 #import "BDAutoTrackParamters.h"
 #import "BDAutoTrackDatabaseService.h"
 
 #import "BDAutoTrackUtility.h"
 #import "BDAutoTrack+Private.h"
+#import "BDAutoTrackRegisterService.h"
 
 #import "NSDictionary+VETyped.h"
 
@@ -39,7 +40,6 @@ static NSString *const kBDDatabseFileCreateTime         = @"kBDDatabseFileCreate
 @property (nonatomic, assign) NSInteger terminateEventIndex;
 @property (nonatomic, copy) NSString *terminateTrackID;
 
-/// appID关联的track实例
 @property (nonatomic, weak) BDAutoTrack *associatedTrack;
 
 @end
@@ -66,8 +66,6 @@ static NSString *const kBDDatabseFileCreateTime         = @"kBDDatabseFileCreate
     return self;
 }
 
-#pragma mark - public
-
 - (void)clearDatabase
 {
     [self enqueue:^{
@@ -75,19 +73,15 @@ static NSString *const kBDDatabseFileCreateTime         = @"kBDDatabseFileCreate
     }];
 }
 
-/// caller: [BDAutoTrack(Special) customEvent: params:]
 - (void)trackWithTableName:(NSString *)tableName data:(NSDictionary *)data {
     BDAutoTrackWeakSelf;
     [self enqueue:^{
         BDAutoTrackStrongSelf;
         NSDictionary *tData = [self addEventIndex:data forTable:tableName];
-        bd_databaseInsertTrack(tableName, tData, nil, self.appID);
+        bd_databaseInsertTrack(tableName, tData, nil, self.appID,nil);
     }];
 }
 
-
-/// 无埋点事件入表
-/// @param data 事件数据
 - (void)trackUIEventWithData:(NSDictionary *)data {
     BDAutoTrackWeakSelf;
     [self enqueue:^{
@@ -103,24 +97,18 @@ static NSString *const kBDDatabseFileCreateTime         = @"kBDDatabseFileCreate
         
         NSInteger identifier = [self trackGlobalEventID];
         [datas setValue:@(identifier) forKey:kBDAutoTrackGlobalEventID];
-        bd_databaseInsertTrack(BDAutoTrackTableUIEvent, datas, nil, self.appID);
+        bd_databaseInsertTrack(BDAutoTrackTableUIEvent, datas, nil, self.appID,nil);
+        
     }];
 }
 
-/// Launch事件入表
-/// @param data 事件数据
 - (void)trackLaunchEventWithData:(NSMutableDictionary *)data {
     BDAutoTrackWeakSelf;
     [self enqueue:^{
         BDAutoTrackStrongSelf;
-        
-        // 如果是被动启动，产生 $app_launch_passively 事件，放到 event_v3 中
-        // 产品侧为了不影响老逻辑，launch事件依然发送，后续看需求可以去掉launch
-        if([data vetyped_boolForKey:kBDAutoTrackIsBackground]) {
-            bool resumeFromBackground = [data vetyped_boolForKey:kBDAutoTrackResumeFromBackground];
-            NSDictionary *trackData = @{kBDAutoTrackEventType:@"$app_launch_passively",
-                                        kBDAutoTrackEventData:@{kBDAutoTrackResumeFromBackground: @(resumeFromBackground)}};
-            [self trackUserEventWithData:trackData];
+        NSString *SSID = bd_registerSSID(self.appID);
+        if (SSID == nil) {
+            [NSThread sleepForTimeInterval:1];
         }
         
         NSInteger identifier = [self trackGlobalEventID];
@@ -133,26 +121,20 @@ static NSString *const kBDDatabseFileCreateTime         = @"kBDDatabseFileCreate
         bd_addScreenOrientation(data, self.appID);
         bd_addGPSLocation(data, self.appID);
         
-        /* 添加首次事件标记($is_first_time事件属性)
-         * 添加时机：每个用户的第一次launch事件需要添加
-         */
         if ([[BDAutoTrackDefaults defaultsWithAppID:self.appID] isUserFirstLaunch]) {
             [data setObject:@"true" forKey:kBDAutoTrackIsFirstTime];
         }
         
-        // add deeplink url
 #if TARGET_OS_IOS
         NSString *ALinkURLString = self.associatedTrack.alinkActivityContinuation.ALinkURLString;
         if (ALinkURLString != nil) {
             [data setObject:ALinkURLString forKey:kBDAutoTrackDeepLinkUrl];
         }
 #endif
-        bd_databaseInsertTrack(BDAutoTrackTableLaunch, data, nil, self.appID);
+        bd_databaseInsertTrack(BDAutoTrackTableLaunch, data, nil, self.appID,nil);
     }];
 }
 
-/// terminate事件入表
-/// @param data 事件数据
 - (void)trackTerminateEventWithData:(NSMutableDictionary *)data {
     BDAutoTrackWeakSelf;
     [self enqueue:^{
@@ -167,12 +149,10 @@ static NSString *const kBDDatabseFileCreateTime         = @"kBDDatabseFileCreate
         bd_addScreenOrientation(data, self.appID);
         bd_addGPSLocation(data, self.appID);
         
-        bd_databaseInsertTrack(BDAutoTrackTableTerminate, data, self.terminateTrackID, self.appID);
+        bd_databaseInsertTrack(BDAutoTrackTableTerminate, data, self.terminateTrackID, self.appID,nil);
     }];
 }
 
-/// event_v3事件入表
-/// @param data 事件数据
 - (void)trackUserEventWithData:(NSDictionary *)data {
     [self impl_trackUserEventWithData:data insertToTable:BDAutoTrackTableEventV3];
 }
@@ -191,15 +171,13 @@ static NSString *const kBDDatabseFileCreateTime         = @"kBDDatabseFileCreate
     BDAutoTrackWeakSelf;
     [self enqueue:^{
         BDAutoTrackStrongSelf;
-        // FilterService: 过滤在blocklist中的埋点事件
         NSDictionary *filterdData = data;
         NSString *appID = self.appID;
         id<BDAutoTrackFilterService> filter = (id<BDAutoTrackFilterService>)bd_standardServices(BDAutoTrackServiceNameFilter, appID);
         if (filter) {
-            filterdData = [filter filterEvent:data];
+            filterdData = [filter filterEvents:data];
         }
         if (filterdData == nil) {
-            // trace: 因事件被BDAutoTrackFilterService过滤，而上报失败。
             return;
         }
         
@@ -214,20 +192,17 @@ static NSString *const kBDDatabseFileCreateTime         = @"kBDDatabseFileCreate
         
         NSInteger identifier = [self trackGlobalEventID];
         [datas setValue:@(identifier) forKey:kBDAutoTrackGlobalEventID];
-        bd_databaseInsertTrack(tableName, datas, nil, self.appID);
+        bd_databaseInsertTrack(tableName, datas, nil, self.appID,nil);
         
         
     }];
 }
 
 - (void)enqueue:(dispatch_block_t)block {
-    // 判断是否开启了事件采集，如果关闭了，那么所有事件都不落库，就不会上报了
-    if (bd_settingsServiceForAppID(self.appID).trackEventEnabled) {
+    if (self.associatedTrack.localConfig.trackEventEnabled) {
         dispatch_async(self.internalQueue, block);
     }
 }
-
-#pragma mark - private
 
 - (NSMutableDictionary *)addEventIndex:(NSDictionary *)originData forTable:(NSString *)tableName {
     NSMutableDictionary *trackData = [NSMutableDictionary dictionaryWithDictionary:originData];

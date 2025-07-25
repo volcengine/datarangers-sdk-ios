@@ -30,11 +30,7 @@
     XCTAssertEqualObjects(appShortVersion, appShortVersionEx);
 }
 
-/// strange, always fail in ci but success in local https://stackoverflow.com/questions/22171403/how-can-i-unit-test-infodictionary-behavior
 - (void)testAppIdentifier {
-    /// NSString *bundleIdentifierEx = [[NSBundle bundleForClass:[self class]].infoDictionary objectForKey:@"CFBundleIdentifier"];
-    /// XCTAssertEqualObjects([BDAutoTrackSandBoxHelper bundleIdentifier], bundleIdentifierEx);
-    /// XCTAssertEqualObjects([NSBundle bundleForClass:[self class]].bundleIdentifier, bundleIdentifierEx);
 }
 
 - (void)testUA {

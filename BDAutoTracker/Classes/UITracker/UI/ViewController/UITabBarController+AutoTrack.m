@@ -11,9 +11,6 @@
 #import "BDUIAutoTracker.h"
 #import "BDAutoTrackSwizzle.h"
 
-
-/// UITabBarController 第一个展示的VC也会有回调
-
 @implementation UITabBarController (AutoTrack)
 
 + (void)load {

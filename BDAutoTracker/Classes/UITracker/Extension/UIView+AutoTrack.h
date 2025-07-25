@@ -8,8 +8,6 @@
 
 #import <UIKit/UIKit.h>
 
-// UIView 所在 controller 相关的信息
-
 NS_ASSUME_NONNULL_BEGIN
 
 @interface UIView (AutoTrack)

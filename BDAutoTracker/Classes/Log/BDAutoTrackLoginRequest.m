@@ -8,7 +8,6 @@
 
 #import "BDAutoTrackLoginRequest.h"
 
-#import "BDToast.h"
 #import "BDTrackerCoreConstants.h"
 
 @implementation BDAutoTrackLoginRequest
@@ -16,9 +15,6 @@
 - (instancetype)initWithAppID:(NSString *)appID {
     self = [super initWithAppID:appID type:BDAutoTrackRequestURLSimulatorLogin];
     if (self) {
-        self.failureCallback = ^{
-            bd_picker_toastShow(@"Login failed! Please try again.");
-        };
     }
     
     return self;

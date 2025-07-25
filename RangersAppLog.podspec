@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'RangersAppLog'
-  s.version          = '6.10.1'
+  s.version          = '6.17.4'
   s.summary          = '火山引擎数据采集SDK'
   s.description      = '火山引擎数据采集SDK'
   s.homepage         = 'https://github.com/bytedance/RangersAppLog'
@@ -19,8 +19,7 @@ Pod::Spec.new do |s|
     core.ios.frameworks = 'UIKit'
     core.osx.frameworks = 'AppKit'
     core.library = 'z','sqlite3'
-    
-    core.dependency 'RangersAppLog/VEInstall'
+
     core.source_files = [
       'BDAutoTracker/Classes/Core/**/**/*.{h,m,c}',
     ]
@@ -29,60 +28,8 @@ Pod::Spec.new do |s|
       'BDAutoTracker/Classes/Core/Network/BDAutoTrackNetworkResponse.{h,m}',
     ]
     core.resource_bundles = {
-      'RangersAppLog' => ['BDAutoTracker/Asserts/Core/*.js']
+      'RangersAppLog' => ['BDAutoTracker/Asserts/Core/*.txt']
     }
-  end
-  
-  s.subspec 'VEInstall' do |install|
-    install.frameworks = ['Security', 'CoreTelephony', 'SystemConfiguration', 'CoreFoundation']
-    install.library = 'z'
-    install.source_files = [
-      'BDAutoTracker/Classes/VEInstall/Core/**/*.{h,m,c}',
-    ]
-    install.public_header_files = [
-      'BDAutoTracker/Classes/VEInstall/Core/Public/*.h'
-    ]
-  end
-  
-  s.subspec 'IDFA' do |idfa|
-    idfa.frameworks = ['AdSupport', 'AppTrackingTransparency']
-    idfa.source_files = [
-      'BDAutoTracker/Classes/VEInstall/IDFA/**/*.{h,m,c}',
-    ]
-    idfa.public_header_files = [
-      'BDAutoTracker/Classes/VEInstall/IDFA/**/*.h',
-    ]
-  end
-
-  s.subspec 'Host' do |host|
-    host.dependency 'RangersAppLog/Core'
-    
-    host.subspec 'CN' do |cn|
-      cn.source_files = [
-        'BDAutoTracker/Classes/Host/CN/**/*.{h,m}',
-      ]
-      cn.public_header_files = [
-        'BDAutoTracker/Classes/Host/CN/*.h'
-      ]
-    end
-
-    host.subspec 'SG' do |sg|
-      sg.source_files = [
-        'BDAutoTracker/Classes/Host/SG/**/*.{h,m}'
-      ]
-      sg.public_header_files = [
-        'BDAutoTracker/Classes/Host/SG/*.h'
-      ]
-    end
-
-    host.subspec 'VA' do |va|
-      va.source_files = [
-        'BDAutoTracker/Classes/Host/VA/**/*.{h,m}'
-      ]
-      va.public_header_files = [
-        'BDAutoTracker/Classes/Host/VA/*.h'
-      ]
-    end
   end
   
   s.subspec 'Log' do |tracker|
@@ -109,9 +56,6 @@ Pod::Spec.new do |s|
 
     picker.source_files = 'BDAutoTracker/Classes/Picker/**/*.{h,m,c,mm}'
     picker.public_header_files = 'BDAutoTracker/Classes/Picker/Header/*.h'
-    # picker.resource_bundles = {
-    #   'RangersAppLog' => ['BDAutoTracker/Assets/*.xcassets']
-    # }
   end
 
   s.subspec 'DeviceOrientation' do |deviceOrientation|
@@ -120,13 +64,6 @@ Pod::Spec.new do |s|
 
     deviceOrientation.source_files = 'BDAutoTracker/Classes/DeviceOrientation/**/*.{h,m,c,mm}'
     deviceOrientation.public_header_files = 'BDAutoTracker/Classes/DeviceOrientation/**/*.h'
-  end
-
-  # C接口Bridge。在Unity Native Plugin等场景下使用。一般可以忽略。 
-  s.subspec 'CBridge' do |c|
-    c.dependency 'RangersAppLog/Core'
-    c.source_files = 'BDAutoTracker/Classes/CBridge/*.{h,m}'
-    c.public_header_files = 'BDAutoTracker/Classes/CBridge/*.h'
   end
   
   s.subspec 'Exposure' do |exp|
@@ -143,8 +80,6 @@ Pod::Spec.new do |s|
   
   s.test_spec 'Tests' do |h|
     h.requires_app_host = false
-    h.dependency 'RangersAppLog/Picker'
-    h.dependency 'OCMock','~> 3.8.1'
     h.dependency 'XcodeCoverage','>= 1.3.2'
     
     h.source_files = 'BDAutoTracker/Tests/**/*.{h,m}'

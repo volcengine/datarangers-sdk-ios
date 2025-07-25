@@ -14,6 +14,7 @@
 #import "BDAutoTrackUtility.h"
 #import "BDAutoTrackSwizzle.h"
 #import "BDAutoTrackServiceCenter.h"
+#import "BDAutoTrack+Private.h"
 
 @implementation BDAutoTrackH5Bridge
 
@@ -97,11 +98,11 @@
                 continue;
             }
             NSString *appID = track.appID;
-            BDAutoTrackLocalConfigService *localSettings = bd_settingsServiceForAppID(appID);
+            
+            BDAutoTrackLocalConfigService *localSettings = track.localConfig;
             NSArray<NSString *> *allowedDomainPatterns = localSettings.H5BridgeAllowedDomainPatterns;
             BOOL allowAll = localSettings.H5BridgeDomainAllowAll;
             
-            // 判断当前实例是否允许该域名注入bridge
             BOOL isAllowedDomain = NO;
             if (allowAll) {
                 shouldInjectScript = YES;
@@ -131,11 +132,9 @@
         }
         
         if (!hasInjected) {
-            /* 设置MessageHandler */
             [ucc removeScriptMessageHandlerForName:rangersapplog_script_message_handler_name];
             [ucc addScriptMessageHandler:[[BDAutoTrackScriptMessageHandler alloc] init] name:rangersapplog_script_message_handler_name];
             
-            /* 注入UserScript */
             [ucc addUserScript:injectingScript];
         }
     }
@@ -145,7 +144,7 @@
     NSBundle *bundle = [NSBundle bundleForClass:self.classForCoder];
     NSURL *bundleURL = [[bundle resourceURL] URLByAppendingPathComponent:@"RangersAppLog.bundle"];
     NSBundle *resourceBundle = [NSBundle bundleWithURL:bundleURL];
-    NSString *jsFilePath = [resourceBundle pathForResource:@"h5bridge-wkwebview" ofType:@"js"];
+    NSString *jsFilePath = [resourceBundle pathForResource:@"h5bridge-wkwebview" ofType:@"txt"];
     NSString *jsFileContent = [NSString stringWithContentsOfFile:jsFilePath encoding:NSUTF8StringEncoding error:nil];
     
     return jsFileContent;

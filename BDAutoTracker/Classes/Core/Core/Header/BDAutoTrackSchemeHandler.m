@@ -15,6 +15,7 @@
 #import "BDTrackerCoreConstants.h"
 #import "BDAutoTrackInternalHandler.h"
 #import "RangersLog.h"
+#import "BDAutoTrackUI.h"
 
 static NSMutableDictionary * bd_picker_URLReportParameters(NSURL *URL) {
     if (![URL isKindOfClass:[NSURL class]]) {
@@ -61,52 +62,70 @@ static NSMutableDictionary * bd_picker_URLReportParameters(NSURL *URL) {
     return self;
 }
 
-
 - (BOOL)handleURL:(NSURL *)URL appID:(NSString *)appID scene:(id)scene {
-    
-    
-    if ([URL.absoluteString length] == 0) {
-        RL_WARN(appID, @"[URL_Handler] terminate due to EMPTY URL. (%@)", appID);
+    NSString *targetAppID = [appID copy];
+    if ([targetAppID hasPrefix:@"rangers://"]) {
+        @try {
+            NSURL *aidUrl = [NSURL URLWithString:targetAppID];
+            NSString *aidBase64 = [[aidUrl.path stringByReplacingOccurrencesOfString:@"/" withString:@""] stringByRemovingPercentEncoding];
+            NSString *aidMd5 = aidUrl.host;
+            if (aidBase64.length > 0 && aidMd5.length > 0) {
+                NSString *parserAid = ral_base64_string(aidBase64);
+                if ([bd_calc_md5([parserAid UTF8String]) caseInsensitiveCompare:aidMd5] == NSOrderedSame) {
+                    targetAppID = parserAid;
+                }
+            }
+        } @catch (NSException *exception) {
+        }
+    }
+    if (![URL isKindOfClass:NSURL.class] || URL.absoluteString.length < 1) {
+        NSLog(@"[Rangers:%@][OPEN_URL] terminate due to invalid URL.",targetAppID);
         return NO;
     }
-    RL_DEBUG(appID, @"[URL_Handler] process start. (%@)", URL.absoluteString);
-    
-    if (![appID isKindOfClass:[NSString class]] || appID.length < 1) {
-        RL_WARN(appID, @"[URL_Handler] terminate due to INVALID APPID. (%@)", appID);
+    NSURL *targetURL = [URL copy];
+    if (![targetURL.scheme.lowercaseString hasPrefix:@"rangersapplog"]) {
         return NO;
     }
+    
+    if (![targetAppID isKindOfClass:[NSString class]] || targetAppID.length < 1) {
+        NSLog(@"[Rangers:%@][OPEN_URL] terminate due to Invalid appId.", targetAppID);
+        return NO;
+    }
+   
+    BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:targetAppID];
+    if (!tracker) {
+        NSLog(@"[Rangers:%@][OPEN_URL] terminate due to Tracker instance has not finished initializing.", targetAppID);
+        return NO;
+    }
+    RL_DEBUG(tracker,@"OPEN_URL", @"process start. (%@:%@)", targetAppID, targetURL.absoluteString);
+    [tracker eventV3:@"bav_scheme" params:bd_picker_URLReportParameters(targetURL)];
+    
 
-    BDAutoTrack *track = [BDAutoTrack trackWithAppID:appID];
-    if ([track isKindOfClass:[BDAutoTrack class]]) {
-        [track eventV3:@"bav_scheme" params:bd_picker_URLReportParameters(URL)];
-    } else {
-        RL_WARN(appID, @"[URL_Handler] terminate due to NO TRACKER FOUND. (%@)", appID);
-        return NO;
-    }
-    
-    if ([self handleInternalURL:URL appID:appID scene:scene]) {
-        RL_DEBUG(appID, @"[URL_Handler] process successful. (%@)", URL.absoluteString);
+    if ([self handleInternalURL:targetURL appID:targetAppID scene:scene]) {
+        RL_INFO(targetAppID, @"OPEN_URL",@"sdk process successful. (%@)", targetURL.absoluteString);
         return YES;
     } else {
-        RL_ERROR(appID, @"[URL_Handler] handleInternalURL:appID:scene: process failure. (%@)", URL.absoluteString);
+        RL_ERROR(targetAppID, @"OPEN_URL",@"sdk process failure. (%@)", targetURL.absoluteString);
     }
 
     BOOL handled = NO;
     BDSemaphoreLock(self.semaphore);
+    RL_INFO(targetAppID, @"OPEN_URL",@"custom process start. (%@)", targetURL.absoluteString);
     for (id<BDAutoTrackSchemeHandler> handler in self.handlers) {
         
-        RL_DEBUG(appID, @"[URL_Handler] BDAutoTrackSchemeHandler trying . (%@)", handler);
-        if ([handler handleURL:URL appID:appID scene:scene]) {
-            RL_DEBUG(appID, @"[URL_Handler] BDAutoTrackSchemeHandler process successful . (%@)", handler);
+        if ([handler handleURL:targetURL appID:targetAppID scene:scene]) {
+            RL_INFO(targetAppID, @"OPEN_URL",@"custom process successful. (%@)", targetURL.absoluteString);
             handled = YES;
             break;
-        } else {
-            RL_DEBUG(appID, @"[URL_Handler] BDAutoTrackSchemeHandler process failure . (%@)", handler);
         }
     }
+    if (handled) {
+        RL_INFO(targetAppID, @"OPEN_URL",@"custom process successful. (%@)", targetURL.absoluteString);
+        return YES;
+    } else {
+        RL_ERROR(targetAppID, @"OPEN_URL",@"custom process failure. (%@)", targetURL.absoluteString);
+    }
     BDSemaphoreUnlock(self.semaphore);
-
-    RL_DEBUG(appID, @"[URL_Handler] process failure. (%@)", URL.absoluteString);
     return handled;
 }
 

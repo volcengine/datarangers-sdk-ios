@@ -28,10 +28,7 @@
 #import <RangersAppLog/BDAutoTrack.h>
 #import <RangersAppLog/BDAutoTrack+SharedInstance.h>
 #import <RangersAppLog/BDAutoTrack+Profile.h>
-#import <RangersAppLog/BDAutoTrack+Game.h>
-#import <RangersAppLog/BDAutoTrack+GameTrack.h>
 #import <RangersAppLog/BDAutoTrack+Special.h>
-#import <RangersAppLog/BDAutoTrack+OhayooGameTrack.h>
 
 #import <RangersAppLog/BDAutoTrackSchemeHandler.h>
 #import <RangersAppLog/BDAutoTrackNotifications.h>
@@ -45,19 +42,13 @@
 #import <RangersAppLog/BDKeyWindowTracker.h>
 #endif
 
-#if __has_include(<RangersAppLog/BDAutoTrackURLHostItemCN.h>)
-#import <RangersAppLog/BDAutoTrackURLHostItemCN.h>
+#if __has_include(<RangersAppLog/BDAutoTrack+OneID.h>)
+#import <RangersAppLog/BDAutoTrack+OneID.h>
 #endif
 
-#if __has_include(<RangersAppLog/BDAutoTrackURLHostItemSG.h>)
-#import <RangersAppLog/BDAutoTrackURLHostItemSG.h>
+#if __has_include(<RangersAppLog/BDAutoTrack+Extension.h>)
+#import <RangersAppLog/BDAutoTrack+Extension.h>
 #endif
 
-#if __has_include(<RangersAppLog/BDAutoTrackURLHostItemVA.h>)
-#import <RangersAppLog/BDAutoTrackURLHostItemVA.h>
 #endif
-
-
-
-#endif /* RangersAppLog_h */
 

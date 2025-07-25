@@ -9,11 +9,14 @@
 #import <Foundation/Foundation.h>
 #import "BDAutoTrackDurationEvent.h"
 #import "RangersLog.h"
+#import "BDAutoTrack+Private.h"
 
 
 #pragma mark - BDAutoTrackDurationEvent
 
-@interface BDAutoTrackDurationEvent()
+@interface BDAutoTrackDurationEvent() {
+    __weak BDAutoTrack *track;
+}
 
 @end
 
@@ -52,15 +55,16 @@
 
 - (void)updateAppId:(NSString *)appId {
     self.appId = appId;
+    track = [BDAutoTrack trackWithAppID:appId];
 }
 
 - (void)start:(NSNumber *)startTimeMS {
     if (self.state == BDAutoTrackDurationEventStop) {
-        RL_WARN(self.appId, @"%@ start failed: already stoped!", self.eventName);
+        RL_WARN(track,@"AutoTrack", @"%@ start failed: already stoped!", self.eventName);
         return;
     }
     if (self.state != BDAutoTrackDurationEventInit) {
-        RL_WARN(self.appId, @"%@ start failed: already started!", self.eventName);
+        RL_WARN(track,@"AutoTrack", @"%@ start failed: already started!", self.eventName);
         return;
     }
     
@@ -70,15 +74,15 @@
 
 - (void)pause:(NSNumber *)pauseTimeMS {
     if (self.state == BDAutoTrackDurationEventInit) {
-        RL_WARN(self.appId, @"%@ pause failed: did not start yet!", self.eventName);
+        RL_WARN(track,@"AutoTrack", @"%@ pause failed: did not start yet!", self.eventName);
         return;
     }
     if (self.state == BDAutoTrackDurationEventPause) {
-        RL_WARN(self.appId, @"%@ pause failed: already paused!", self.eventName);
+        RL_WARN(track,@"AutoTrack", @"%@ pause failed: already paused!", self.eventName);
         return;
     }
     if (self.state == BDAutoTrackDurationEventStop) {
-        RL_WARN(self.appId, @"%@ pause failed: already stoped!", self.eventName);
+        RL_WARN(track,@"AutoTrack", @"%@ pause failed: already stoped!", self.eventName);
         return;
     }
     
@@ -93,7 +97,7 @@
 
 - (void)resume:(NSNumber *)resumeTimeMS {
     if (self.state != BDAutoTrackDurationEventPause) {
-        RL_WARN(self.appId, @"%@ resume failed: did not pause yet!", self.eventName);
+        RL_WARN(track,@"AutoTrack", @"%@ resume failed: did not pause yet!", self.eventName);
         return;
     }
     
@@ -103,11 +107,11 @@
 
 - (void)stop:(NSNumber *)stopTimeMS {
     if (self.state == BDAutoTrackDurationEventInit) {
-        RL_WARN(self.appId, @"%@ stop failed: did not start yet!", self.eventName);
+        RL_WARN(track,@"AutoTrack", @"%@ stop failed: did not start yet!", self.eventName);
         return;
     }
     if (self.state == BDAutoTrackDurationEventStop) {
-        RL_WARN(self.appId, @"%@ stop failed: already stoped!", self.eventName);
+        RL_WARN(track,@"AutoTrack", @"%@ stop failed: already stoped!", self.eventName);
         return;
     }
     
@@ -134,7 +138,9 @@
 
 @end
 
-@implementation BDAutoTrackDurationEventManager
+@implementation BDAutoTrackDurationEventManager {
+    __weak BDAutoTrack *track;
+}
 
 #pragma mark - BDAutoTrackDurationEventManager init
 
@@ -156,6 +162,7 @@
 
 - (void)initWithAppId:(NSString *)appId {
     self.appId = appId;
+    track = [BDAutoTrack trackWithAppID:appId];
 }
 
 
@@ -164,7 +171,7 @@
 - (void)startDurationEvent:(NSString *)eventName startTimeMS:(NSNumber *) startTimeMS {
     BDAutoTrackDurationEvent *durationEvent = [self getDurationEvent:eventName];
     if (durationEvent != nil && durationEvent.state != BDAutoTrackDurationEventStop) {
-        RL_WARN(self.appId, @"startDurationEvent failed: %@ already exist!", eventName);
+        RL_WARN(track,@"AutoTrack", @"startDurationEvent failed: %@ already exist!", eventName);
         return;
     }
     
@@ -177,7 +184,7 @@
 - (void)pauseDurationEvent:(NSString *)eventName pauseTimeMS:(NSNumber *) pauseTimeMS {
     BDAutoTrackDurationEvent *durationEvent = [self getDurationEvent:eventName];
     if (durationEvent == nil) {
-        RL_WARN(self.appId, @"pauseDurationEvent failed: %@ not exist!", eventName);
+        RL_WARN(track,@"AutoTrack", @"pauseDurationEvent failed: %@ not exist!", eventName);
         return;
     }
     
@@ -187,7 +194,7 @@
 - (void)resumeDurationEvent:(NSString *)eventName resumeTimeMS:(NSNumber *) resumeTimeMS {
     BDAutoTrackDurationEvent *durationEvent = [self getDurationEvent:eventName];
     if (durationEvent == nil) {
-        RL_WARN(self.appId, @"resumeDurationEvent failed: %@ not exist!", eventName);
+        RL_WARN(track,@"AutoTrack", @"resumeDurationEvent failed: %@ not exist!", eventName);
         return;
     }
     
@@ -197,7 +204,7 @@
 - (BDAutoTrackDurationEvent *)stopDurationEvent:(NSString *)eventName stopTimeMS:(NSNumber *) stopTimeMS {
     BDAutoTrackDurationEvent *durationEvent = [self getDurationEvent:eventName];
     if (durationEvent == nil) {
-        RL_WARN(self.appId, @"stopDurationEvent failed: %@ not exist!", eventName);
+        RL_WARN(track,@"AutoTrack", @"stopDurationEvent failed: %@ not exist!", eventName);
         return nil;
     }
     

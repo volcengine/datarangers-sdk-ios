@@ -12,6 +12,7 @@
 #import "BDAutoTrackUtility.h"
 #import "BDAutoTrackMacro.h"
 #import "BDTrackerCoreConstants.h"
+#import "BDAutoTrackMainBundle.h"
 
 @interface BDAutoTrackDefaults ()
 
@@ -30,7 +31,6 @@ static NSString *defaultPlistFileName = @"config.plist";
 
 @implementation BDAutoTrackDefaults
 
-/// Instances created by this method will be cached in `allDefaults`.
 + (instancetype)defaultsWithAppID:(NSString *)appID {
     static NSMutableDictionary<NSString *, BDAutoTrackDefaults *> *allDefaults = nil;
     static dispatch_semaphore_t semaphore = NULL;
@@ -59,9 +59,6 @@ static NSString *defaultPlistFileName = @"config.plist";
     return [self initWithAppID:appID name:defaultPlistFileName];
 }
 
-/// dedicated initializer
-/// @param appID Part of the suite name. Helps suite name unique within the app.
-/// @param name Part of the suite name. Helps suite name unique within the app.
 - (instancetype)initWithAppID:(NSString *)appID name:(NSString *)name {
     self = [super init];
     if (self) {
@@ -75,7 +72,6 @@ static NSString *defaultPlistFileName = @"config.plist";
     return self;
 }
 
-// lazy init
 - (BDAutoTrackDefaults_Fallback *)fallbackDefaults {
     if (!_fallbackDefaults) {
         _fallbackDefaults = [[BDAutoTrackDefaults_Fallback alloc] initWithAppID:self.appID name:self.name];
@@ -201,8 +197,6 @@ static NSString *defaultPlistFileName = @"config.plist";
 
 #pragma mark save
 - (void)saveDataToFile {
-    // No need to sync here according to the document of `- [NSUserDefaults synchronize]`.
-    // So currently this method does nothing but satisfy old code calls.
 }
 
 #pragma mark clear data in cache and plist file
@@ -237,7 +231,7 @@ static NSString *defaultPlistFileName = @"config.plist";
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         
-        NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+        NSString *version = [bd_app_main_bundle() objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
         NSString *key = [NSString stringWithFormat:@"%@-%@",kBDAutoTrackIsAPPFirstTimeLaunch,version];
         if ([self stringValueForKey:key] == nil) {
             s_isAPPFirstLaunch = YES;

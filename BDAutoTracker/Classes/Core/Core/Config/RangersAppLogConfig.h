@@ -13,16 +13,14 @@ NS_ASSUME_NONNULL_BEGIN
 @protocol BDAutoTrackUniqueIDHandler <NSObject>
 
 - (NSString *)uniqueID;
+- (BOOL)isAuthorized;
 
 @end
 
-/// 自己用的单例类，存放一些属性
 @interface RangersAppLogConfig : NSObject
 
-/// 默认为
 @property (nonatomic, copy, nullable) BDAutoTrackServiceVendor defaultVendor;
 @property (atomic, strong) id<BDAutoTrackUniqueIDHandler> handler;
-/// 是否已连接到服务器圈选
 @property (nonatomic, assign, getter=isSeversidePickerAvailable) BOOL seversidePickerAvailable;
 
 + (instancetype)sharedInstance;

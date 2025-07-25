@@ -11,7 +11,6 @@
 
 @implementation BDAutoTrackConfig (AppLog)
 
-/* TrackEvent */
 - (BOOL)trackEventEnabled {
     return [objc_getAssociatedObject(self, @selector(trackEventEnabled)) boolValue];
 }
@@ -20,7 +19,6 @@
     objc_setAssociatedObject(self, @selector(trackEventEnabled), @(enabled), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-/* AutoTrack */
 - (BOOL)autoTrackEnabled {
     return [objc_getAssociatedObject(self, @selector(autoTrackEnabled)) boolValue];
 }
@@ -29,7 +27,14 @@
     objc_setAssociatedObject(self, @selector(autoTrackEnabled), @(autoTrackEnabled), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-/* H5AutoTrack */
+- (BDAutoTrackDataType)autoTrackEventType {
+    return [objc_getAssociatedObject(self, @selector(autoTrackEventType)) intValue];
+}
+
+- (void)setAutoTrackEventType:(BDAutoTrackDataType)autoTrackEventType {
+    objc_setAssociatedObject(self, @selector(autoTrackEventType), @(autoTrackEventType), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
 - (BOOL)H5AutoTrackEnabled {
     return [objc_getAssociatedObject(self, @selector(H5AutoTrackEnabled)) boolValue];
 }
@@ -38,7 +43,6 @@
     objc_setAssociatedObject(self, @selector(H5AutoTrackEnabled), @(H5AutoTrackEnabled), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-/* screenOrientationEnabled */
 - (BOOL)screenOrientationEnabled {
     return [objc_getAssociatedObject(self, @selector(screenOrientationEnabled)) boolValue];
 }
@@ -47,35 +51,12 @@
     objc_setAssociatedObject(self, @selector(screenOrientationEnabled), @(screenOrientationEnabled), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-/* trackGPSLocationEnabled */
 - (BOOL)trackGPSLocationEnabled {
     return [objc_getAssociatedObject(self, @selector(trackGPSLocationEnabled)) boolValue];
 }
 
 - (void)setTrackGPSLocationEnabled:(BOOL)trackGPSLocationEnabled {
     objc_setAssociatedObject(self, @selector(trackGPSLocationEnabled), @(trackGPSLocationEnabled), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-}
-
-/* trackPageLeaveEnabled */
-- (BOOL)trackPageLeaveEnabled {
-    return [objc_getAssociatedObject(self, @selector(trackPageLeaveEnabled)) boolValue];
-}
-
-- (void)setTrackPageLeaveEnabled:(BOOL)trackPageLeaveEnabled {
-    objc_setAssociatedObject(self, @selector(trackPageLeaveEnabled), @(trackPageLeaveEnabled), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-}
-
-
-- (BOOL)gameModeEnable {
-    return [objc_getAssociatedObject(self, @selector(gameModeEnable)) boolValue];
-}
-
-- (void)setGameModeEnable:(BOOL)gameModeEnable {
-    objc_setAssociatedObject(self, @selector(gameModeEnable), @(gameModeEnable), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-}
-
-- (BOOL)autoActiveUser {
-    return [objc_getAssociatedObject(self, @selector(autoActiveUser)) boolValue];
 }
 
 - (void)setAutoActiveUser:(BOOL)autoActiveUser {
@@ -107,6 +88,14 @@
     objc_setAssociatedObject(self, @selector(logNeedEncrypt), @(logNeedEncrypt), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
+- (BOOL)logReportOptimizeEnabled {
+    return [objc_getAssociatedObject(self, @selector(logReportOptimizeEnabled)) boolValue];
+}
+
+- (void)setLogReportOptimizeEnabled:(BOOL)logReportOptimizeEnabled {
+    objc_setAssociatedObject(self, @selector(logReportOptimizeEnabled), @(logReportOptimizeEnabled), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
 - (BOOL)autoFetchSettings {
     return [objc_getAssociatedObject(self, @selector(autoFetchSettings)) boolValue];
 }
@@ -122,6 +111,32 @@
 
 - (void)setAbEnable:(BOOL)abEnable {
     objc_setAssociatedObject(self, @selector(abEnable), @(abEnable), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+- (BOOL)launchTerminateEnable {
+    return [objc_getAssociatedObject(self, @selector(launchTerminateEnable)) boolValue];
+}
+
+- (void)setLaunchTerminateEnable:(BOOL)enable {
+    objc_setAssociatedObject(self, @selector(launchTerminateEnable), @(enable), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+- (BDAutoTrackMockBlock)mockVendorIDBlock {
+    return objc_getAssociatedObject(self, @selector(mockVendorIDBlock));
+}
+
+- (void)setMockVendorIDBlock:(BDAutoTrackMockBlock)mockVendorIDBlock {
+    BDAutoTrackMockBlock value = [mockVendorIDBlock copy];
+    objc_setAssociatedObject(self, @selector(mockVendorIDBlock), value, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+- (BDAutoTrackMockBlock)mockAdvertisingIDBlock {
+    return objc_getAssociatedObject(self, @selector(mockAdvertisingIDBlock));
+}
+
+- (void)setMockAdvertisingIDBlock:(BDAutoTrackMockBlock)mockAdvertisingIDBlock {
+    BDAutoTrackMockBlock value = [mockAdvertisingIDBlock copy];
+    objc_setAssociatedObject(self, @selector(mockAdvertisingIDBlock), value, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 @end

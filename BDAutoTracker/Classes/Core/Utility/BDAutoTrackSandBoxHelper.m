@@ -5,12 +5,12 @@
 //  Created by 冯靖君 on 17/2/15.
 //  Copyright 2022 Beijing Volcanoengine Technology Ltd. All Rights Reserved.
 //
-//
 
 #import "BDAutoTrackSandBoxHelper.h"
 #import "NSDictionary+VETyped.h"
 #import "BDAutoTrackDeviceHelper.h"
 #import "BDTrackerCoreConstants.h"
+#import "BDAutoTrackMainBundle.h"
 
 static NSString *const kTTInstallAppVersion = @"kTTInstallAppVersion";
 static NSString *const kAppLogInstallAppVersion = @"kAppLogInstallAppVersion";
@@ -19,7 +19,7 @@ NSString * bd_sandbox_appDisplayName() {
     static NSString *appName = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        appName = [[[NSBundle mainBundle] infoDictionary] vetyped_stringForKey:@"CFBundleDisplayName"];
+        appName = [[bd_app_main_bundle() infoDictionary] vetyped_stringForKey:@"CFBundleDisplayName"];
         if (appName == nil) {
             appName = bd_sandbox_appName();
         }
@@ -32,7 +32,7 @@ NSString * bd_sandbox_appDisplayName() {
     static NSString *appName = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        appName = [[[NSBundle mainBundle] infoDictionary] vetyped_stringForKey:@"CFBundleName"];
+        appName = [[bd_app_main_bundle() infoDictionary] vetyped_stringForKey:@"CFBundleName"];
     });
 
     return appName;
@@ -40,12 +40,12 @@ NSString * bd_sandbox_appDisplayName() {
 
 
 NSString *bd_sandbox_releaseVersion() {
-    return [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+    return [bd_app_main_bundle() objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
 }
 
 
 NSString *bd_sandbox_buildVersion() {
-    return [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleVersion"];
+    return [bd_app_main_bundle() objectForInfoDictionaryKey:@"CFBundleVersion"];
 }
 
 NSString *bd_sandbox_bundleIdentifier() {
@@ -58,8 +58,6 @@ NSString *bd_sandbox_bundleIdentifier() {
     return bundleIdentifier;
 }
 
-/// 产生header字段user_agent
-/// 因为一些历史原因，目前实现将AppName转了latin字符集
 NSString *bd_sandbox_userAgent() {
     static NSString * userAgentStr = nil;
     static dispatch_once_t onceToken;
@@ -104,7 +102,6 @@ BOOL bd_sandbox_isUpgradeUser() {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSUserDefaults *userDefault = [NSUserDefaults standardUserDefaults];
-        //记下用户首次安装的版本号
         NSString *preAppVersion = [userDefault stringForKey:kAppLogInstallAppVersion] ?: [userDefault stringForKey:kTTInstallAppVersion];
         if (preAppVersion.length < 1) {
             dispatch_async(dispatch_get_main_queue(), ^{

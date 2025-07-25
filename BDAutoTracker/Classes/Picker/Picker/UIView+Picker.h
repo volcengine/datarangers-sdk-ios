@@ -16,6 +16,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (BOOL)bd_hasAction;
 
+- (void)bd_pickerViewStart;
+
 - (UIView *)bd_pickedView;
 
 - (NSDictionary *)bd_pickerInfo;

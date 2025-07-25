@@ -11,7 +11,6 @@
 #ifdef DEBUG
 
 @implementation NSURLRequest (RALDebug)
-/* 生成VSCode「REST Client」插件所需要的请求格式（HTTP 语言） */
 - (NSString *)debug_VSCodeRESTClientPlugin_HTTP {
     NSMutableString *result = [[NSMutableString alloc] init];
     [result appendString:[NSString stringWithFormat:@"%@ %@ %@\n", self.HTTPMethod, self.URL.absoluteString, @"HTTP/1.1"]];
@@ -28,7 +27,6 @@
     return result;
 }
 
-/* 生成VSCode「REST Client」插件所需要的请求格式（cURL 格式） */
 - (NSString *)debug_VSCodeRESTClientPlugin_cURL {
     NSMutableString *result = [[NSMutableString alloc] init];
     [result appendString:[NSString stringWithFormat:@"curl -i -X %@ ", self.HTTPMethod]];

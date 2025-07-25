@@ -40,25 +40,24 @@ static NSString * const BDASpecialParams        = @"second_app";
 
 - (BOOL)eventV3:(NSString *)event params:(NSDictionary *)params specialParams:(NSDictionary *)specialParams {
     if (![event isKindOfClass:[NSString class]] || event.length < 1) {
-        
-        RL_WARN(self.appID, @"terminate event due to EVENT IS EMPTY STRING");
+        RL_WARN(self,@"Event", @"terminate event due to EVENT IS EMPTY STRING");
         return NO;
     }
 
     if (bd_batchIsEventInBlockList(event, self.appID)) {
-        RL_WARN(self.appID, @"terminate event due to EVENT IN BLOCK LIST");
+        RL_WARN(self,@"Event",@"terminate event due to EVENT IN BLOCK LIST");
         return NO;
     }
 
     NSString *eventName = [NSString stringWithFormat:@"%@_%@",BDASpecialParams,event];
 
     if (specialParams.count != 4) {
-        RL_WARN(self.appID, @"please user `specialParamsWitAppID:appName:type` to build  specialParams. specialParams(%@)",bd_JSONRepresentation(specialParams));
+        RL_WARN(self,@"Event",@"please user `specialParamsWitAppID:appName:type` to build  specialParams. specialParams(%@)",bd_JSONRepresentation(specialParams));
         return NO;
     }
 
     if (params && ![NSJSONSerialization isValidJSONObject:params]) {
-        RL_WARN(self.appID, @"terminate event due to INVALID PARAMETERS");
+        RL_WARN(self,@"Event",@"terminate event due to INVALID PARAMETERS");
         return NO;
     }
 
@@ -67,7 +66,12 @@ static NSString * const BDASpecialParams        = @"second_app";
     NSDictionary *trackData = @{kBDAutoTrackEventType:eventName,
                                 kBDAutoTrackEventData:data,};
 
-    [self.dataCenter trackUserEventWithData:trackData];
+    if (self.config.rollback) {
+        [self.dataCenter trackUserEventWithData:trackData];
+    } else {
+        [self.eventGenerator trackEvent:eventName parameter:data options:nil];
+    }
+    
     return YES;
 }
 
@@ -86,26 +90,28 @@ static NSString * const BDASpecialParams        = @"second_app";
                               kBDAutoTrackTimeSync,
                               kBDAutoTrackMagicTag];
     });
-    /// 此接口给内部支持log_data使用，但是考虑一下还是加一下check避免异常调用
-    NSString *appID = self.appID;
     if (![category isKindOfClass:[NSString class]] ||
         [category stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet].length < 1) {
-        RL_WARN(self.appID, @"terminate event due to ILLEGAL CATEGORY 1. (%@)",category);
+        RL_WARN(self,@"Event",@"terminate event due to ILLEGAL CATEGORY 1. (%@)",category);
         return NO;
     }
     category = [category stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
     if ([allInternalTables containsObject:category]) {
-        RL_WARN(self.appID, @"terminate event due to ILLEGAL CATEGORY 2. (%@)",category);
+        RL_WARN(self,@"Event",@"terminate event due to ILLEGAL CATEGORY 2. (%@)",category);
         return NO;
     }
 
     if (params && ![NSJSONSerialization isValidJSONObject:params]) {
-        RL_WARN(self.appID, @"terminate event due to INVALID PARAMETERS",category);
+        RL_WARN(self,@"Event",@"terminate event due to INVALID PARAMETERS",category);
         return NO;
     }
 
-    [self.dataCenter trackWithTableName:category data:[[NSDictionary alloc] initWithDictionary:params copyItems:YES]];
-
+    if (self.config.rollback) {
+        [self.dataCenter trackWithTableName:category data:[[NSDictionary alloc] initWithDictionary:params copyItems:YES]];
+    } else {
+        [self.eventGenerator trackEventType:category eventBody:params options:nil];
+    }
+    
     return YES;
 }
 

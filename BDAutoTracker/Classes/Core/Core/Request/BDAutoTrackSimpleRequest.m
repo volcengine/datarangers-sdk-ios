@@ -18,6 +18,7 @@
 #import "BDAutoTrackParamters.h"
 #import "BDAutoTrackUtility.h"
 #import "BDAutoTrackURLHostProvider.h"
+#import "BDAutoTrack+Private.h"
 #import "NSDictionary+VETyped.h"
 
 @implementation BDAutoTrackSimpleRequest
@@ -53,12 +54,13 @@
         [result addEntriesFromDictionary:parameters];
     }
     [result setValue:@(bd_currentInterval().longLongValue) forKey:kBDAutoTrackLocalTime];
-    [result setValue:bd_timeSync() forKey:kBDAutoTrackTimeSync];
+    [result setValue:[[BDAutoTrack trackWithAppID:self.appID].localConfig serverTime] forKey:kBDAutoTrackTimeSync];
     
     return result;
 }
 
 - (NSMutableDictionary *)requestHeaderParameters {
+    
     NSMutableDictionary *header = [super requestHeaderParameters];
     [header setValue:@(BDAutoTrackerSDKVersion) forKey:kBDPickerSDKVersion];
     CGSize resolution = CGSizeZero;
@@ -71,6 +73,7 @@
     [header setValue:@((int)(resolution.height)) forKey:@"height"];
     
     return header;
+    
 }
 
 @end

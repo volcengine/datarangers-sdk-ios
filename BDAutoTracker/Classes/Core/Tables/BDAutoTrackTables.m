@@ -21,7 +21,7 @@ NSMutableArray<NSString *> *bd_db_allTableNames(BDAutoTrackDatabaseQueue *databa
     [tableNames addObject:BDAutoTrackTableEventV3];
     [tableNames addObject:BDAutoTrackTableProfile];
     BDAutoTrackBaseTable *extraTable = [[BDAutoTrackBaseTable alloc] initWithTableName:BDAutoTrackTableExtraEvent databaseQueue:databaseQueue];
-    NSArray<NSDictionary *> *allExtra = [extraTable allTracks];
+    NSArray<NSDictionary *> *allExtra = [extraTable allTracks:nil];
     for (NSDictionary *extra in allExtra) {
         NSString *tableName = [extra vetyped_stringForKey:@"kTableName"];
         if (tableName.length > 0 && ![tableName isEqualToString:BDAutoTrackTableExtraEvent]) {

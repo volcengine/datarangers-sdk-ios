@@ -21,11 +21,10 @@ FOUNDATION_EXTERN NSString * const BDAutoTrackNotificationRegisterSuccess;
 
 FOUNDATION_EXTERN NSString * const BDAutoTrackNotificationRegisterFailure;
 
+FOUNDATION_EXTERN NSString * const BDAutoTrackNotificationActiveSuccess;
+
 FOUNDATION_EXTERN NSString * const BDAutoTrackNotificationABTestSuccess;
 
-/*! @abstract SDK通知的userInfo的 key 定义
- 若无特别说明，值类型为NSString。
-*/
 FOUNDATION_EXTERN NSString * const kBDAutoTrackNotificationAppID;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackNotificationRangersDeviceID;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackNotificationSSID;
@@ -41,8 +40,11 @@ FOUNDATION_EXTERN BDAutoTrackNotificationDataSource BDAutoTrackNotificationDataS
 FOUNDATION_EXTERN BDAutoTrackNotificationDataSource BDAutoTrackNotificationDataSourceServer;
 
 FOUNDATION_EXTERN NSString * const kBDAutoTrackNotificationDataSourceURL;
+
 FOUNDATION_EXTERN NSString * const BDAutoTrackNotificationABTestVidsChanged;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackNotificationABTestVids;
 FOUNDATION_EXTERN NSString * const kBDAutoTrackNotificationABTestExternalVids;
+
+FOUNDATION_EXTERN NSString * const BDAutoTrackRemoteConfigDidUpdateNotification;
 
 #endif

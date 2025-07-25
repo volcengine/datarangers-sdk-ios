@@ -12,10 +12,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface NSURL (ral_ALink)
 
-/// get ALink token
 - (nullable NSString *)ral_alink_token;
 
-/// get ALink custom params
 - (nullable NSArray <NSURLQueryItem *> *)ral_alink_custom_params;
 
 @end

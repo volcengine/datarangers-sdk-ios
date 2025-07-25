@@ -14,8 +14,7 @@ NS_ASSUME_NONNULL_BEGIN
 @interface BDAutoTrackBaseRequest : NSObject
 
 @property (nonatomic, copy) NSString *method;
-@property (nonatomic, assign) BOOL encrypt;
-@property (nonatomic, assign) BOOL compress;
+@property (nonatomic, assign) NSTimeInterval timeout;
 @property (nonatomic, copy, nullable) NSString *requestURL;
 @property (nonatomic, assign) BDAutoTrackRequestURLType requestType;
 
@@ -23,9 +22,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable)  dispatch_block_t failureCallback;
 
 @property (nonatomic, copy, readonly) NSString *appID;
+@property (nonatomic, assign) BOOL isRequesting;
 
-/// 用于给Post body和激活请求的tt_info query加密
-@property (nonatomic, weak, readonly) id<BDAutoTrackEncryptionDelegate> encryptionDelegate;
+
 
 - (instancetype)initWithAppID:(NSString *)appID;
 
@@ -49,6 +48,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)handleSuccessResponse;
 - (void)handleFailureResponseWithRetry:(NSInteger)retry reason:(NSString *)reason;
+
+- (void)notifyResponse;
 
 @end
 

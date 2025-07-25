@@ -24,8 +24,9 @@
 
 #pragma mark - init
 
+static BDAutoTrackApplication *sharedInstance = nil;
+
 + (instancetype)shared {
-    static BDAutoTrackApplication *sharedInstance = nil;
     static dispatch_once_t onceToken;
     
     dispatch_once(&onceToken, ^{
@@ -141,8 +142,8 @@
 
 - (void)updateGPSLocation:(enum BDAutoTrackGeoCoordinateSystem)geoCoordinateSystem longitude:(double)longitude latitude:(double)latitude {
     self.geoCoordinateSystem = [self geo_coordinate_system_str:geoCoordinateSystem];
-    self.longitude = longitude * pow(10, 6);
-    self.latitude = latitude * pow(10, 6);
+    self.longitude = longitude;
+    self.latitude = latitude;
 }
 
 - (BOOL)hasGPSLocation {
@@ -156,13 +157,19 @@
     }
     
     self.autoTrackGeoCoordinateSystem = [self geo_coordinate_system_str:geoCoordinateSystem];
-    self.autoTrackLongitude = longitude * pow(10, 6);
-    self.autoTrackLatitude = latitude * pow(10, 6);
+    self.autoTrackLongitude = longitude;
+    self.autoTrackLatitude = latitude;
     self.autoTrackUpdateLocationLastTime = nowTime;
 }
 
 - (BOOL)hasAutoTrackGPSLocation {
     return self.autoTrackGeoCoordinateSystem != nil;
+}
+
++ (void)updateAutoTrackGPSLocation:(enum BDAutoTrackGeoCoordinateSystem)geoCoordinateSystem longitude:(double)longitude latitude:(double)latitude  {
+    if (sharedInstance != nil) {
+        [sharedInstance updateAutoTrackGPSLocation:geoCoordinateSystem longitude:longitude latitude:latitude];
+    }
 }
 
 @end

@@ -12,6 +12,7 @@
 #import "BDAutoTrackURLHostItemPrivate.h"
 #import "BDAutoTrackLocalConfigService.h"
 #import "BDTrackerCoreConstants.h"
+#import "BDAutoTrack+Private.h"
 
 @interface BDAutoTrackURLHostProvider ()
 
@@ -53,11 +54,10 @@
     }
 }
 
-/// @return hostURL
-/// e.g. @"https://gist.github.com/"s
 - (NSString *)URLForURLType:(BDAutoTrackRequestURLType)type
                       appID:(NSString *)appID {
-    BDAutoTrackLocalConfigService *settings = bd_settingsServiceForAppID(appID);
+    BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:appID];
+    BDAutoTrackLocalConfigService *settings = tracker.localConfig;
     BDAutoTrackServiceVendor vendor = settings.serviceVendor;
     if (vendor == nil) {
         return nil;
@@ -68,7 +68,6 @@
         NSCAssert(0, @"vendor is not in the list");
     }
     
-    /* 服务端圈选、埋点验证的域名来自二维码，存储于localConfig.pickerHost */
     if (type == BDAutoTrackRequestURLSimulatorLogin ||
         type == BDAutoTrackRequestURLSimulatorLog ||
         type == BDAutoTrackRequestURLSimulatorUpload) {
@@ -78,7 +77,21 @@
         return [self requestURLWithHost:host path:path];
     }
     
-    /* 私有化用户可通过URLBlock和HostBlock自定义上报地址 */
+    NSString *url = @"";
+    if (tracker.identifier.isAuthorized) {
+        url = [self createAdvertisingRequestURL:settings type:type];
+    }
+    if (url.length == 0) { //use default url
+        url = [self createRequestURL:settings type:type];
+    }
+    return url;
+}
+
+- (NSString *)createRequestURL:(BDAutoTrackLocalConfigService *)settings type:(BDAutoTrackRequestURLType)type
+{
+    BDAutoTrackServiceVendor vendor = settings.serviceVendor;
+    id<BDAutoTrackURLHostItemProtocol> hostItem = [self.hostItems objectForKey:vendor];
+    
     BDAutoTrackRequestURLBlock requestURLBlock = settings.requestURLBlock;
     NSString *requestURL = nil;
     if (requestURLBlock) {
@@ -94,11 +107,33 @@
         requestURL = [self requestURLWithHost:host path:path];
     }
     
-    /* 若无Block或Block未命中，则使用SDK内置上报地址 */
     if (requestURL.length < 1) {
         requestURL = [hostItem URLForURLType:type];
     }
 
+    return requestURL;
+}
+
+- (NSString *)createAdvertisingRequestURL:(BDAutoTrackLocalConfigService *)settings type:(BDAutoTrackRequestURLType)type
+{
+    BDAutoTrackServiceVendor vendor = settings.serviceVendor;
+    id<BDAutoTrackURLHostItemProtocol> hostItem = [self.hostItems objectForKey:vendor];
+    
+    BDAutoTrackRequestURLBlock requestURLBlock = settings.requestAdvertisingURLBlock;
+    NSString *requestURL = nil;
+    if (requestURLBlock) {
+        requestURL = requestURLBlock(vendor, type);
+        requestURL = bd_validateRequestURL(requestURL);
+    }
+    
+    BDAutoTrackRequestHostBlock requestHostBlock = settings.requestAdvertisingHostBlock;
+    if (requestURL.length < 1 && requestHostBlock) {
+        NSString *host = requestHostBlock(vendor, type);
+        NSString *path = [hostItem URLPathForURLType:type];
+        
+        requestURL = [self requestURLWithHost:host path:path];
+    }
+    
     return requestURL;
 }
 

@@ -62,8 +62,6 @@
 #pragma mark save
 - (void)saveDataToFile {
     BDSemaphoreLock(self.semaphore);
-    //    NSDictionary *data = bd_trueDeepCopyOfDictionary(self.rawData);
-    // Since self.rawData is guarded by lock, it is OK to write it directly(or just make a shadow copy).
     NSDictionary *data = [self.rawData copy];
     if (@available(iOS 11, *)) {
         NSError *err;

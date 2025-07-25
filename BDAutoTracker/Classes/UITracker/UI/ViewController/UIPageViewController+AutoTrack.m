@@ -12,8 +12,6 @@
 #import "BDUIAutoTracker.h"
 #import "BDAutoTrackSwizzle.h"
 
-/// UIPageViewController 第一个展示的VC 不会有回调
-
 @interface BDPageDelegateDecorator: NSObject
 
 @end

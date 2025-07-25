@@ -20,13 +20,23 @@ NS_ASSUME_NONNULL_BEGIN
                     databaseQueue:(BDAutoTrackDatabaseQueue *)databaseQueue;
 
 - (bool)insertTrack:(NSDictionary *)track
-            trackID:(nullable NSString *)trackID;
+            trackID:(nullable NSString *)trackID
+          withError:(NSError **)outErr;
+
+- (bool)insertTrack:(NSDictionary *)track
+            trackID:(NSString *)trackID
+            options:(nullable NSDictionary *)options
+          withError:(NSError **)outErr;
 
 - (void)removeTracksByID:(NSArray<NSString *> *)trackIDs;
 
+- (void)downgradeTracksByID:(NSArray<NSString *> *)trackIDs;
+
 - (void)deleteAll;
 
-- (NSArray<NSDictionary *> *)allTracks;
+- (NSArray<NSDictionary *> *)allTracks:(nullable NSDictionary *)options;
+
+- (NSUInteger)count;
 
 @end
 

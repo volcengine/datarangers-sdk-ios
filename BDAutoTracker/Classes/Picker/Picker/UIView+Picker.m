@@ -38,7 +38,6 @@
         UIControl *control = (UIControl *)self;
         hasAction = control.isEnabled && control.allTargets.count > 0;
     }
-    /// list元素白名单
     if (!hasAction) {
         hasAction = [self isKindOfClass:[UITableViewCell class]] || [self isKindOfClass:[UICollectionViewCell class]];
     }
@@ -73,12 +72,10 @@
         return self;
     }
 
-    /// web view
     if ([self bd_isWebViewComponent]) {
         return [self bd_webView];
     }
 
-    /// 响应点击的control
     if ([self isKindOfClass:[UIControl class]]) {
         UIControl *selfControl = (UIControl *)self;
         if (selfControl.allTargets.count > 0 && selfControl.enabled) {
@@ -87,13 +84,11 @@
     }
 
     UIResponder *nextResponder = [self nextResponder];
-    /// 上面已经不是view了
     if (![nextResponder isKindOfClass:[UIView class]]) {
         return self;
     }
 
     UIView *next = (UIView *)nextResponder;
-    /// 大小不一样
     if (![self bd_isSizeCloseToParent:next.bounds]) {
         return self;
     }
@@ -106,7 +101,6 @@
         return next;
     }
 
-    /// 本身无事件
     if (self.gestureRecognizers.count < 1) {
         return [next bd_pickedView];
     }
@@ -190,8 +184,9 @@
 }
 
 - (AppLogPickerView *)bd_pickerView {
-    // webView should return a BDPickerView
     return nil;
 }
+
+- (void)bd_pickerViewStart {}
 
 @end

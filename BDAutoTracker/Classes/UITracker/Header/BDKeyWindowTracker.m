@@ -67,7 +67,7 @@ NSString * const BDDefaultScene  = @"Default Configuration";
     dispatch_semaphore_wait(self.semaphore, DISPATCH_TIME_FOREVER);
     UIWindow *value = [self.keyWindows objectForKey:BDDefaultScene];
     if (!value) {
-        value = [UIApplication sharedApplication].keyWindow;
+        value = [[UIApplication sharedApplication].windows firstObject];
     }
     dispatch_semaphore_signal(self.semaphore);
 

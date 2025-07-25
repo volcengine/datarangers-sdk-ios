@@ -21,7 +21,6 @@
             if (original_Method_Imp) {
 
                 if (action && to && [to isKindOfClass:[NSObject class]]) {
-                    /// 导航栏上面的按钮 非系统定义的
                     if ([from isKindOfClass:[UIBarButtonItem class]] && ![to bd_AutoTrackInternalItem]) {
                         UIBarButtonItem *item = (UIBarButtonItem *)from;
                         bd_ui_trackNavigationButton(item, event);
@@ -31,13 +30,10 @@
                                 || [from isKindOfClass:[UIStepper class]]
                                 || [from isKindOfClass:[UISegmentedControl class]]
                                 || [from isKindOfClass:[UIDatePicker class]]) {
-                        /// slider事件过于频繁
                         if ([from isKindOfClass:[UIControl class]]
                             && ![from isKindOfClass:[UISlider class]]) {
                             NSString *clazzName = NSStringFromClass([from class]);
-                            /// 过滤系统的一些action
                             if (![clazzName hasPrefix:@"_"]) {
-                                // tabbar 切换
                                 //if ([to isKindOfClass:[UITabBar class]]) {}
                                 UIControl *control = (UIControl *)from;
                                 bd_ui_trackControl(control, event);

@@ -10,10 +10,8 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// 降级控制
 @interface BDAutoTrackBatchSchedule : NSObject
 
-/// use default value
 @property (nonatomic, assign) NSInteger keepCount;
 @property (nonatomic, assign) NSTimeInterval scheduleIntervalMin;
 @property (nonatomic, assign) NSTimeInterval scheduleInterval;

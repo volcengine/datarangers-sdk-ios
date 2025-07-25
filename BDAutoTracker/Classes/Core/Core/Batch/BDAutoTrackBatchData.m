@@ -37,6 +37,18 @@
     self.realSentData = data;
 }
 
+- (void)checkSendData:(NSString *)ssid {
+    [self.realSentData enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSArray *tracks, BOOL *stop) {
+        for (NSDictionary *track in tracks) {
+            id ssid = track[@"ssid"];
+            if ([ssid isKindOfClass:[NSString class]] && [ssid length] > 0) {
+                continue;
+            }
+            [track setValue:ssid forKey:@"ssid"];
+        }
+    }];
+}
+
 @end
 
 

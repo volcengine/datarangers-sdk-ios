@@ -1,14 +1,21 @@
+//
+//  BDAutoTrackNetworkRequest.m
+//  RangersAppLog
+//
+//  Created by bob on 2019/9/13.
+//  Copyright 2022 Beijing Volcanoengine Technology Ltd. All Rights Reserved.
+//
+
 #import "BDAutoTrackReachability.h"
 #import <SystemConfiguration/SystemConfiguration.h>
 #import <netinet/in.h>
 #import <netinet6/in6.h>
 #import <arpa/inet.h>
-//  Copyright 2022 Beijing Volcanoengine Technology Ltd. All Rights Reserved.
 #import <ifaddrs.h>
 #import <netdb.h>
 #import <notify_keys.h>
 
-NSNotificationName const BDAutoTrackReachabilityChangedNotification = @"BDAutoTrackReachabilityChangedNotification";
+NSNotificationName const BDAutoTrackReachabilityDidChangeNotification = @"BDAutoTrackReachabilityDidChangeNotification";
 
 static BDAutoTrackReachabilityStatus networkStatusForFlags(SCNetworkReachabilityFlags flags) {
     
@@ -132,7 +139,7 @@ static void BDAutoTrackReachabilityReleaseCallback(const void *info) {
         __strong __typeof(weakSelf)strongSelf = weakSelf;
         if (strongSelf && strongSelf.reachabilityStatus != status) {
             strongSelf.reachabilityStatus = status;
-            [[NSNotificationCenter defaultCenter] postNotificationName:BDAutoTrackReachabilityChangedNotification
+            [[NSNotificationCenter defaultCenter] postNotificationName:BDAutoTrackReachabilityDidChangeNotification
                                                                 object:nil];
             
         }

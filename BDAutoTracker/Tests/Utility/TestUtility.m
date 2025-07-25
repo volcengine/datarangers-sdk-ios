@@ -83,14 +83,12 @@
     XCTestExpectation *expectation = [self expectationWithDescription:@"interval"];
     NSNumber *interval11 = bd_currentInterval();
     NSTimeInterval interval12 = bd_currentIntervalValue();
-    /// 会有误差
     XCTAssertEqualWithAccuracy(interval11.doubleValue, interval12, 0.2);
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         NSNumber *interval21 = bd_currentInterval();
         NSTimeInterval interval22 = bd_currentIntervalValue();
         XCTAssertEqualWithAccuracy(interval21.doubleValue, interval22, 0.2);
 
-        /// dispatch_after 1s不准确，误差
         XCTAssertEqualWithAccuracy(interval21.doubleValue, interval11.doubleValue, 1.4);
         XCTAssertEqualWithAccuracy(interval12, interval22, 1.4);
         [expectation fulfill];
@@ -100,8 +98,8 @@
 }
 
 - (void)testQueryFromDictionary {
-    NSString *all = @"?!@#$^&%*+,:;='\"`<>()[]{}/\\| "; ///
-    all = @"\"#%<>[\\]^`{|}"; /// query allowed
+    NSString *all = @"?!@#$^&%*+,:;='\"`<>()[]{}/\\| "; 
+    all = @"\"#%<>[\\]^`{|}";
     __block NSInteger index = 1;
     NSMutableDictionary<NSString *, NSString *> *param = [NSMutableDictionary new];
     [all enumerateSubstringsInRange:NSMakeRange(0, all.length) options:NSStringEnumerationByComposedCharacterSequences usingBlock:^(NSString * substring, NSRange substringRange, NSRange enclosingRange, BOOL *stop) {
@@ -154,7 +152,7 @@
 
 - (void)testDeepCopy {
     NSDictionary *param = @{@"Test1":@"1",
-                            @"Test2":@"2",/// @(2) will not mutable copy
+                            @"Test2":@"2",
                             @"Test3":@{
                                     @"Test31":@"Test",
                                     @"Test32":@"Test"

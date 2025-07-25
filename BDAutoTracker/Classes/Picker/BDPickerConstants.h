@@ -22,8 +22,7 @@ FOUNDATION_EXTERN NSString * const kBDPickerPicURL;
 FOUNDATION_EXTERN NSString * const kBDPickerNeedUpload;
 FOUNDATION_EXTERN NSString * const kBDPickerIsBind;
 FOUNDATION_EXTERN NSString * const kBDPickerIsHTML;
-
-
-FOUNDATION_EXTERN NSString * const kBDPickerStartNotification;
+FOUNDATION_EXTERN NSString * const kBDPickerIgnore;
+FOUNDATION_EXTERN NSString * const kBDPickerChildren;
 
 NS_ASSUME_NONNULL_END

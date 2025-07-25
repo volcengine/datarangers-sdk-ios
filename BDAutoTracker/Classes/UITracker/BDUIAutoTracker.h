@@ -8,7 +8,6 @@
 
 #import <Foundation/Foundation.h>
 
-/// UI 自动埋点 启动
 NS_ASSUME_NONNULL_BEGIN
 
 @class UIView, UIControl, UITableView, UICollectionView, UIViewController, UIAlertController;
@@ -34,6 +33,7 @@ FOUNDATION_EXTERN void bd_ui_trackTableView(UITableView *tableView, NSIndexPath 
 FOUNDATION_EXTERN void bd_ui_trackCollectionView(UICollectionView *collectionView, NSIndexPath *indexPath);
 FOUNDATION_EXTERN void bd_ui_trackPageEvent(UIViewController *from, UIViewController *to, BOOL isBack);
 FOUNDATION_EXTERN void bd_ui_trackPageLeaveEvent(UIViewController *vc, NSDictionary *params);
+FOUNDATION_EXTERN void bd_ui_trackPresentPage(UIViewController *from, UIViewController *to, BOOL isBack);
 FOUNDATION_EXTERN void bd_ui_trackPage(UIViewController *from, UIViewController *to, BOOL isBack);
 FOUNDATION_EXTERN void bd_ui_trackPages(NSArray<UIViewController *> *froms, NSArray<UIViewController *> *tos);
 FOUNDATION_EXTERN BOOL bd_ui_isMultiPage(UIViewController *page);
@@ -41,5 +41,15 @@ FOUNDATION_EXTERN BOOL bd_ui_isMultiPage(UIViewController *page);
 #pragma mark - web event
 
 FOUNDATION_EXTERN void bd_ui_trackWebEvent(id _Nullable event);
+
+
+@interface BDUIAutoTracker : NSObject
+
++ (instancetype)shared;
+
+- (nullable NSString *)lastPageKey;
+- (void)updatePageKey:(NSString *)pageKey;
+
+@end
 
 NS_ASSUME_NONNULL_END

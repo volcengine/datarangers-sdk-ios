@@ -10,6 +10,7 @@
 #import "BDAutoTrack+Private.h"
 #import "BDTrackerCoreConstants.h"
 #import "BDAutoTrackNotifications.h"
+#import "BDAutoTrackPageLeave.h"
 
 #import "UIViewController+AutoTrack.h"
 #import "UITableViewCell+AutoTrack.h"
@@ -35,6 +36,11 @@ void bd_ui_trackEvent(NSDictionary *event) {
 void bd_ui_trackEventWithData(NSString *event, NSDictionary *data) {
     bd_ui_trackEvent(@{kBDAutoTrackEventType:event ?: @"",
                      kBDAutoTrackEventData:data ?: @{}});
+    
+    if ([event isEqualToString:BDAutoTrackEventNamePage]) {
+        NSString *pageKey = [data valueForKey:kBDAutoTrackEventPage];
+        [[BDUIAutoTracker shared] updatePageKey:pageKey];
+    }
 }
 
 void bd_ui_trackLauchPage(void) {
@@ -44,6 +50,8 @@ void bd_ui_trackLauchPage(void) {
     [data setValue:@"null(launch)" forKey:kBDAutoTrackEventReferPageID];
     [data setValue:@"null(launch)" forKey:kBDAutoTrackEventReferPageTitle];
     bd_ui_trackEventWithData(BDAutoTrackEventNamePage, data);
+    
+    [BDAutoTrackPageLeave.shared enterPage:launch];
 }
 
 void bd_ui_storeTerminatePage(void) {
@@ -52,7 +60,6 @@ void bd_ui_storeTerminatePage(void) {
     [data setValue:@"null(terminate)" forKey:kBDAutoTrackEventPage];
     [data setValue:@"null(terminate)" forKey:kBDAutoTrackEventPageID];
     [data setValue:@"null(terminate)" forKey:kBDAutoTrackEventPageTitle];
-    /// keep safe
     terminatePageHolder = [data copy];
 }
 
@@ -176,7 +183,6 @@ void bd_ui_trackTableView(UITableView *tableView, NSIndexPath *indexPath) {
         [trackInfo addEntriesFromDictionary:[cell bd_trackInfo]];
         NSArray *pos = [cell bd_positions];
         [trackInfo setValue:pos forKey:kBDAutoTrackEventViewIndex];
-        /// add location
         bd_ui_trackAddRectPoint(cell.frame, cell.bd_cellTouchPoint, trackInfo);
         bd_ui_trackEventWithData(BDAutoTrackEventNameListItemClick, trackInfo);
     }
@@ -194,7 +200,6 @@ void bd_ui_trackCollectionView(UICollectionView *collectionView, NSIndexPath *in
         [trackInfo addEntriesFromDictionary:[cell bd_trackInfo]];
         NSArray *pos = [cell bd_positions];
         [trackInfo setValue:pos forKey:kBDAutoTrackEventViewIndex];
-        /// add location
         bd_ui_trackAddRectPoint(cell.frame, cell.bd_cellTouchPoint, trackInfo);
         bd_ui_trackEventWithData(BDAutoTrackEventNameListItemClick, trackInfo);
     }
@@ -203,16 +208,7 @@ void bd_ui_trackCollectionView(UICollectionView *collectionView, NSIndexPath *in
 void bd_ui_trackPageLeaveEvent(UIViewController *vc, NSDictionary *params) {
     NSMutableDictionary *pageInfo = [vc bd_pageTrackInfo];
     [pageInfo addEntriesFromDictionary:params];
-    
-    // 这个是 UIEvent 事件，受全埋点开关影响，正常情况应该走这个
-    // bd_ui_trackEventWithData(BDAutoTrackEventNamePageLeave, data);
-    
-    // 这个是 UserEvent 事件，不受全埋点开关影响，和产品确认后，离开页面的事件暂时走这个（此处与 Android 一致）
-    NSDictionary *data = @{
-        kBDAutoTrackEventType:BDAutoTrackEventNamePageLeave,
-        kBDAutoTrackEventData:pageInfo
-    };
-    [BDAutoTrack trackPageLeaveEventWithData:data];
+    bd_ui_trackEventWithData(BDAutoTrackEventNamePageLeave, pageInfo);
 }
 
 void bd_ui_trackPageEvent(UIViewController *from, UIViewController *to, BOOL isBack) {
@@ -220,13 +216,17 @@ void bd_ui_trackPageEvent(UIViewController *from, UIViewController *to, BOOL isB
         return;
     }
     
+    NSDictionary *params = [BDAutoTrackPageLeave.shared leavePage:from];
+    bd_ui_trackPageLeaveEvent(from, params);
     
     
     NSMutableDictionary *data = [to bd_pageTrackInfo];
     [data addEntriesFromDictionary:[from bd_referPageTrackInfo]];
     [data setValue:(isBack ? @1 : @0) forKey:kBDAutoTrackEventPageIsBack];
     bd_ui_trackEventWithData(BDAutoTrackEventNamePage, data);
-    /// postNotification for Heimdallr
+    
+    [BDAutoTrackPageLeave.shared enterPage:to];
+    
     NSDictionary *userInfo = @{kBDAutoTrackViewControllerFormer:NSStringFromClass(from.class),
                                kBDAutoTrackViewControllerAfter:NSStringFromClass(to.class),
                                kBDAutoTrackSwitchIsBack:(isBack ? @1 : @0)
@@ -234,6 +234,23 @@ void bd_ui_trackPageEvent(UIViewController *from, UIViewController *to, BOOL isB
     [[NSNotificationCenter defaultCenter] postNotificationName:BDAutoTrackVCSwitchEventNotification
                                                         object:nil
                                                       userInfo:userInfo];
+}
+
+
+void bd_ui_trackPresentPage(UIViewController *from, UIViewController *to, BOOL isBack) {
+    UIViewController *fromTop = [from bd_topViewController:YES];
+    UIViewController *toTop;
+    if (!isBack) {
+        toTop = [to bd_topViewController:YES];
+    } else {
+        toTop = [to bd_topViewController:NO];
+    }
+    
+    if (fromTop.bd_AutoTrackInternalItem || toTop.bd_AutoTrackInternalItem) {
+        return;
+    }
+
+    bd_ui_trackPageEvent(fromTop, toTop, isBack);
 }
 
 void bd_ui_trackPage(UIViewController *from, UIViewController *to, BOOL isBack) {
@@ -284,3 +301,31 @@ BOOL bd_ui_isMultiPage(UIViewController *page) {
 
     return NO;
 }
+
+
+@implementation BDUIAutoTracker {
+    NSString *lastPageKey;
+}
+
++ (instancetype)shared {
+    static BDUIAutoTracker *sharedInstance = nil;
+    static dispatch_once_t onceToken;
+    
+    dispatch_once(&onceToken, ^{
+        sharedInstance = [self new];
+    });
+    
+    return sharedInstance;
+}
+
+- (nullable NSString *)lastPageKey
+{
+    return self->lastPageKey;
+}
+
+- (void)updatePageKey:(NSString *)pageKey;
+{
+    self->lastPageKey = [pageKey copy];
+}
+
+@end

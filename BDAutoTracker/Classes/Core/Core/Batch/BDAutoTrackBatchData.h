@@ -12,6 +12,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface BDAutoTrackBatchData : NSObject
 
+
+@property (nonatomic, assign) NSInteger source;
 @property (nonatomic, assign) BOOL autoTrackEnabled;
 @property (nonatomic, copy) NSDictionary<NSString *, NSArray *> *realSentData;
 @property (nonatomic, copy) NSDictionary<NSString *, NSArray *> *sendingTrackData;
@@ -21,6 +23,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, copy, nullable) NSString *ssID;
 @property (nonatomic, copy, nullable) NSString *userUniqueID;
+@property (nonatomic, copy, nullable) NSString *userUniqueIDType;
 
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray *> *tempTrackDatas;
 @property (nonatomic, strong) NSMutableDictionary<NSString *, NSMutableArray *> *tempTrackIDs;
@@ -28,6 +31,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) NSUInteger maxEventCount;
 
 - (void)filterData;
+
+- (void)checkSendData:(NSString *)ssid;
 
 @end
 

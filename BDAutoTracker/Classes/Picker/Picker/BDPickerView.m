@@ -12,6 +12,7 @@
 #import "BDPickerConstants.h"
 #import <WebKit/WebKit.h>
 #import "BDKeyWindowTracker.h"
+#import "BDAutoTrack+UITracker.h"
 
 #import "BDPickerDependency.h"
 #import "NSDictionary+VETyped.h"
@@ -309,25 +310,36 @@
     }
 
     if ([view isKindOfClass:[WKWebView class]]) {
-        [view bd_pickerView];
+        [view bd_pickerViewStart];
         [container addObject:view];
         [data setValue:@(YES) forKey:@"is_html"];
         return data;
     }
-
+    
+    UIViewController *vc = [self controller];
+    BOOL ignore = NO;
     if ([view bd_pickedView] != view) {
-        [data setValue:@(YES) forKey:@"ignore"];
+        ignore = YES;
+    }
+    if (!ignore) {
+        ignore = [BDAutoTrack isPageIgnored:vc];
+    }
+    if (ignore) {
+        [data setValue:@(YES) forKey:kBDPickerIgnore];
     }
 
     NSMutableArray *children = [NSMutableArray array];
+    NSMutableArray *subViews = [NSMutableArray array];
     for (UIView *sub in view.subviews) {
         if (!sub.hidden && sub.alpha > 0.01
             && sub.userInteractionEnabled) {
             AppLogPickerView *subView = [[AppLogPickerView alloc] initWithView:sub] ;
             [children addObject:[subView simulatorUploadInfoWithWebContainer:container]];
+            [subViews addObject:subView];
         }
     }
-    [data setValue:children forKey:@"children"];
+    [data setValue:children forKey:kBDPickerChildren];
+    self.subViews = subViews;
 
     return data;
 }

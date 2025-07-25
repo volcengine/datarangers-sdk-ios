@@ -19,7 +19,6 @@ __attribute__((constructor)) void bdauto_track_ui_session(void) {
 
 @end
 
-/// 单例，SDK启动时自动初始化
 @implementation BDAutoTrackUISessionHandler
 
 + (instancetype)sharedHandler {

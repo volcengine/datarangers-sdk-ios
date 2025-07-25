@@ -176,4 +176,28 @@
 }
 
 
++ (BOOL)isPageIgnored:(id)controller {
+    NSArray *allTrackers = [BDAutoTrack allTrackers];
+    for (BDAutoTrack *tracker in allTrackers) {
+        if (![tracker isKindOfClass:[BDAutoTrack class]]) {
+            continue;
+        }
+        if ([tracker isPageIgnored:controller]) {
+            return YES;
+        }
+    }
+    
+    return NO;
+}
+
+
+- (nullable NSString *)lastPageKey
+{
+    NSString *pageKey = [BDUIAutoTracker shared].lastPageKey;
+    if (!pageKey) {
+        return nil;
+    }
+    return [pageKey copy];
+}
+
 @end

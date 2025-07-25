@@ -18,6 +18,9 @@
 #import "BDTrackConstants.h"
 #import "BDTrackerCoreConstants.h"
 #import "NSDictionary+VETyped.h"
+#import "RangersLog.h"
+#import "BDAutoTrack+Private.h"
+#import "BDImageHelper.h"
 
 static NSString *const kBDAutoTrackSimulatorServiceTimer = @"kBDAutoTrackSimulatorServiceTimer";
 
@@ -30,7 +33,6 @@ static NSString *const kBDAutoTrackSimulatorServiceTimer = @"kBDAutoTrackSimulat
 
 @end
 
-/// DOM上传服务。
 @implementation BDAutoTrackSimulatorService
 
 - (instancetype)initWithAppID:(NSString *)appID {
@@ -58,6 +60,8 @@ static NSString *const kBDAutoTrackSimulatorServiceTimer = @"kBDAutoTrackSimulat
     [self stopTimer];
 }
 
+
+
 - (void)startTimer {
     BDAutoTrackKeepRequest *request = self.request;
     if (request) {
@@ -75,7 +79,7 @@ static NSString *const kBDAutoTrackSimulatorServiceTimer = @"kBDAutoTrackSimulat
         [self upload];
     };
     [[BDAutoTrackTimer sharedInstance] scheduledDispatchTimerWithName:self.timerName
-                                                         timeInterval:1
+                                                         timeInterval:1.5
                                                                 queue:dispatch_get_main_queue()
                                                               repeats:YES
                                                                action:action];
@@ -88,32 +92,20 @@ static NSString *const kBDAutoTrackSimulatorServiceTimer = @"kBDAutoTrackSimulat
 }
 
 - (void)upload:(NSDictionary *)nativePage withWebView:(NSArray<UIView *> *)webViews {
-    if (webViews.count > 0) {
-        AppLogPickerView *testPickerView = [webViews.lastObject bd_pickerView];
-        if (testPickerView == nil) {
-            BDAutoTrackWeakSelf;
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                BDAutoTrackStrongSelf;
-                [self upload:nativePage withWebView:webViews];
-            });
-            return;
-        }
-    }
-    
     NSMutableArray *pages = [NSMutableArray arrayWithObject:nativePage];
     [webViews enumerateObjectsUsingBlock:^(UIView * _Nonnull webView, NSUInteger idx, BOOL * _Nonnull stop) {
         AppLogPickerView *webPickerView = [webView bd_pickerView];
-        NSArray *dom = [webPickerView webViewSimulatorUploadInfo];
-        NSDictionary *webPage = [webPickerView simulatorUploadInfoPageInfoWithDom:dom];
-        [pages addObject:webPage];
+        if (webPickerView) {
+            NSArray *dom = [webPickerView webViewSimulatorUploadInfo];
+            NSDictionary *webPage = [webPickerView simulatorUploadInfoPageInfoWithDom:dom];
+            [pages addObject:webPage?:@{}];
+        }
     }];
     
-    UIWindow *keyWindow = [BDKeyWindowTracker sharedInstance].keyWindow;
-    UIImage *image = bd_picker_imageForView(keyWindow);
-    NSData *imageData = UIImagePNGRepresentation(image);
-    NSString *base64String = [imageData base64EncodedStringWithOptions:0];
-    NSDictionary *paramters = @{@"img":base64String,
-                                @"pages":pages,
+    NSString *base64String = [self screenshotImageData];
+    
+    NSDictionary *paramters = @{@"img":base64String?:@"",
+                                @"pages":pages?:@[],
     };
     BDAutoTrackKeepRequest *request = self.request;
     if (request) {
@@ -122,7 +114,6 @@ static NSString *const kBDAutoTrackSimulatorServiceTimer = @"kBDAutoTrackSimulat
     }
 }
 
-/// 上传DOM
 - (void)upload {
     if (self.isUploading) {
         return;
@@ -131,8 +122,51 @@ static NSString *const kBDAutoTrackSimulatorServiceTimer = @"kBDAutoTrackSimulat
         return;
     }
     self.isUploading = YES;
-    [[NSNotificationCenter defaultCenter] postNotificationName:kBDPickerStartNotification object:nil];
     
+    id rootView = [self RNRootView];
+    id picker = [self RNPicker];
+    if (rootView && picker) {
+        [self uploadReactNative:rootView picker:picker];
+    } else {
+        [self uploadNative];
+    }
+}
+
+- (NSString *)screenshotImageData
+{
+    UIWindow *keyWindow = [BDKeyWindowTracker sharedInstance].keyWindow;
+    UIImage *image = bd_picker_imageForViewWithScale(keyWindow, 2);
+    NSData *imageData = UIImageJPEGRepresentation(image, 0.1);
+    
+    NSString *base64String = [imageData base64EncodedStringWithOptions:0];
+    return base64String;
+}
+
+- (id)RNRootView {
+    UIWindow *keyWindow = [BDKeyWindowTracker sharedInstance].keyWindow;
+    UIViewController *rootvc = keyWindow.rootViewController;
+    if ([rootvc isKindOfClass:[UINavigationController class]]) {
+        UINavigationController *nav = (UINavigationController *)rootvc;
+        rootvc = [nav topViewController];
+    }
+    if ([NSStringFromClass(rootvc.view.class) isEqualToString:@"RCTRootView"]) {
+        return rootvc.view;
+    }
+    return nil;
+}
+- (id)RNPicker {
+    Class clz = NSClassFromString(@"RangersAppLogPicker");
+    SEL instanceSEL =   NSSelectorFromString(@"shared");
+    if (!clz || !instanceSEL) {
+        return nil;
+    }
+    
+    IMP instanceIMP = [clz methodForSelector:instanceSEL];
+    id (*shared)(id, SEL) = (void *)instanceIMP;
+    return shared(clz,instanceSEL);
+}
+
+- (void)uploadNative {
     NSMutableArray<UIView *> *webViews = [NSMutableArray array];
     UIWindow *keyWindow = [BDKeyWindowTracker sharedInstance].keyWindow;
     AppLogPickerView *picker = [[AppLogPickerView alloc] initWithView:keyWindow];
@@ -144,14 +178,53 @@ static NSString *const kBDAutoTrackSimulatorServiceTimer = @"kBDAutoTrackSimulat
     [doms addObject:dom];
     
     [self simulatorRebuildDom:dom withDoms:doms];
+    [self filterDOMS:doms];
+    
+    picker = [self filterPicker:picker withDOMS:doms];
     
     NSDictionary *nativePage = [picker simulatorUploadInfoPageInfoWithDom:doms];
-    [self upload:nativePage withWebView:webViews];
+    
+    BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:self.appID];
+    if (tracker.config.H5AutoTrackEnabled) {
+        [self upload:nativePage withWebView:webViews];
+    } else {
+        [self upload:nativePage withWebView:@[]];
+    }
+}
+
+- (void)uploadReactNative:(id) rootView picker:(id) picker {
+    SEL pageInfoFromJSSEL = NSSelectorFromString(@"pageInfoFromJS:success:failed:timeout:");
+    IMP pageInfoFromJSIMP = [picker methodForSelector:pageInfoFromJSSEL];
+    if (!pageInfoFromJSIMP) {
+        RL_ERROR([BDAutoTrack trackWithAppID:self.appID], @"Picker", @"React Native failed to find method: pageInfoFromJS.");
+        return;
+    }
+    
+    id uploadBlock = ^(id info){
+        NSMutableArray *pages;
+        if ([info isKindOfClass:[NSDictionary class]]) {
+            pages = [NSMutableArray arrayWithObject:info];
+        } else {
+            pages = [NSMutableArray new];
+        }
+        NSString *base64String = [self screenshotImageData];
+        NSDictionary *paramters = @{@"img":base64String,
+                                    @"pages":pages,
+        };
+        BDAutoTrackKeepRequest *request = self.request;
+        if (request) {
+            request.parameters = paramters;
+            [request startRequestWithRetry:0];
+        }
+    };
+    
+    void (*pageInfoFromJS)(id, SEL, id, void(^)(NSDictionary *info), void(^)(NSString *message), NSTimeInterval) = (void *)pageInfoFromJSIMP;
+    pageInfoFromJS(picker, pageInfoFromJSSEL, rootView, uploadBlock, uploadBlock, 500);
 }
 
 - (void)simulatorRebuildDom:(NSMutableDictionary *)dom withDoms:(NSMutableArray *)doms {
     NSString *path = [dom vetyped_stringForKey:kBDAutoTrackEventViewPath];
-    NSMutableArray<NSMutableDictionary *> *children = [dom objectForKey:@"children"];
+    NSMutableArray<NSMutableDictionary *> *children = [dom objectForKey:kBDPickerChildren];
     NSMutableArray *childrenToRemove = [NSMutableArray new];
     
     if ([children isKindOfClass:[NSArray class]] && children.count > 0) {
@@ -174,12 +247,64 @@ static NSString *const kBDAutoTrackSimulatorServiceTimer = @"kBDAutoTrackSimulat
 - (void)simulatorAddZindex:(NSUInteger *)zindex toDom:(NSMutableDictionary *)dom {
     [dom setValue:@(*zindex) forKey:@"zIndex"];
     *zindex= (*zindex + 1);
-    NSArray<NSMutableDictionary *> *children = [dom objectForKey:@"children"];
+    NSArray<NSMutableDictionary *> *children = [dom objectForKey:kBDPickerChildren];
     if ([children isKindOfClass:[NSArray class]] && children.count > 0) {
         for (NSMutableDictionary *ch in children) {
             [self simulatorAddZindex:zindex toDom:ch];
         }
     }
+}
+
+- (void)filterDOMS:(NSMutableArray *)doms {
+    NSMutableArray *removeList = [NSMutableArray new];
+    for (NSMutableDictionary *dom in doms) {
+        if ([dom valueForKey:kBDPickerIgnore]) {
+            [removeList addObject:dom];
+        }
+    }
+    [doms removeObjectsInArray:removeList];
+}
+
+- (NSMutableDictionary *)filterDOM:(NSMutableDictionary *)dom {
+    NSMutableArray *newChildren = [NSMutableArray new];
+    for (NSMutableDictionary *child in [dom valueForKey:kBDPickerChildren]) {
+        if (![child valueForKey:kBDPickerIgnore]) {
+            [newChildren addObject:[self filterDOM:child]];
+        }
+    }
+    [dom setValue:newChildren forKey:kBDPickerChildren];
+    
+    if ([dom valueForKey:kBDPickerIgnore] && newChildren.count == 1) {
+        return [newChildren lastObject];
+    }
+    return dom;
+}
+
+- (AppLogPickerView *)filterPicker:(AppLogPickerView *)picker withDOMS:(NSMutableArray *)doms {
+    if (doms.count != 1) {
+        return picker;
+    }
+    
+    NSString *elementPath = [[doms lastObject] valueForKey:kBDAutoTrackEventViewPath];
+    AppLogPickerView *target = [self findPicker:picker byPath:elementPath];
+    if (target) {
+        return target;
+    }
+    return picker;
+}
+
+- (AppLogPickerView *)findPicker:(AppLogPickerView *)picker byPath:(NSString *)elementPath {
+    if ([picker.elementPath isEqual:elementPath]) {
+        return picker;
+    }
+    
+    for (AppLogPickerView *subView in picker.subViews) {
+        AppLogPickerView *target = [self findPicker:subView byPath:elementPath];
+        if (target) {
+            return target;
+        }
+    }
+    return nil;
 }
 
 @end

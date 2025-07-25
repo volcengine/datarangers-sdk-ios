@@ -11,21 +11,13 @@
 NS_ASSUME_NONNULL_BEGIN
 
 typedef NS_ENUM(NSInteger, BDAutoTrackConnectionType) {
-    /// 初始状态
     BDAutoTrackConnectionTypeUnknown = -1,
-    /// 无网络连接
     BDAutoTrackConnectionTypeNone = 0,
-    /// 移动网络连接
     BDAutoTrackConnectionTypeMobile = 1,
-    /// 2G网络连接
     BDAutoTrackConnectionType2G = 2,
-    /// 3G网络连接
     BDAutoTrackConnectionType3G = 3,
-    /// wifi网络连接
     BDAutoTrackConnectionTypeWiFi = 4,
-    /// 4G网络连接
     BDAutoTrackConnectionType4G = 5,
-    /// 5G网络连接
     BDAutoTrackConnectionType5G = 6
 };
 
@@ -41,13 +33,7 @@ typedef NS_ENUM(NSInteger, BDAutoTrackConnectionType) {
 - (void)startTrack;
 
 
-//network
 - (BOOL)isNetworkConnected;
-
-/**
- * JSONObject for CTCarrier
- */
-- (id)carrier;
 
 - (NSString *)connectionTypeName;
 

@@ -17,25 +17,26 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)clearDatabase;
 
-/********************** 埋点出库 **********************/
-- (NSDictionary<NSString *, NSArray *> *)allTracksForBatchReport;
+- (NSDictionary<NSString *, NSArray *> *)allTracksForBatchReport:(nullable NSDictionary *)options;
 - (NSArray<NSDictionary *> *)profileTracks;
 
-/********************** 埋点入库 **********************/
 - (void)insertTable:(NSString *)tableName
               track:(NSDictionary *)track
-            trackID:(nullable NSString *)trackID;
+            trackID:(nullable NSString *)trackID
+            options:(nullable NSDictionary *)options;
 
-/********************** 将埋点从DB中删除 **********************/
 - (void)removeTracks:(NSDictionary<NSString *, NSArray *> *)trackIDs;
 
-/********************** 其它数据库查询 **********************/
+//降级priority=0
+- (void)downgradeTracks:(NSDictionary<NSString *, NSArray *> *)trackIDs;
+
 - (NSArray<NSString *> *)allTableNames;
 
 - (BDAutoTrackBaseTable *)ceateTableWithName:(NSString *)tableName;
 
-/********************** 数据库vacuum **********************/
 - (void)vacuumDatabase;
+
+- (NSUInteger)count;
 
 @end
 
@@ -45,14 +46,18 @@ FOUNDATION_EXTERN BDAutoTrackDatabaseService * _Nullable bd_databaseServiceForAp
 FOUNDATION_EXTERN void bd_databaseInsertTrack(NSString *tableName,
                                               NSDictionary *track,
                                               NSString *_Nullable trackID,
-                                              NSString *appID);
+                                              NSString *appID,
+                                              NSDictionary *_Nullable options);
+
 FOUNDATION_EXTERN void bd_databaseRemoveTracks(NSDictionary<NSString *, NSArray *> *trackIDs,
                                                NSString *appID);
 
-/// for unit test
+FOUNDATION_EXTERN void bd_databaseDowngradeTracks(NSDictionary<NSString *, NSArray *> *trackIDs,
+                                               NSString *appID);
+
 FOUNDATION_EXTERN BDAutoTrackBaseTable * bd_databaseCeateTable(NSString *tableName, NSString *appID);
 
-FOUNDATION_EXTERN NSString * bd_databaseFilePath(void); /// old database file
+FOUNDATION_EXTERN NSString * bd_databaseFilePath(void);
 FOUNDATION_EXTERN NSString *bd_databaseFilePathForAppID(NSString *appID);
 
 NS_ASSUME_NONNULL_END

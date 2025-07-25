@@ -44,7 +44,11 @@ CGSize bd_picker_screenSize() {
 }
 
 UIImage * bd_picker_imageForView(UIView *view) {
-    UIGraphicsBeginImageContextWithOptions(view.frame.size, false, [UIScreen mainScreen].scale);
+    return bd_picker_imageForViewWithScale(view, [UIScreen mainScreen].scale);
+}
+
+UIImage * bd_picker_imageForViewWithScale(UIView *view, CGFloat scale) {
+    UIGraphicsBeginImageContextWithOptions(view.frame.size, false, scale);
     [view.layer renderInContext:UIGraphicsGetCurrentContext()];
     UIImage* image = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();

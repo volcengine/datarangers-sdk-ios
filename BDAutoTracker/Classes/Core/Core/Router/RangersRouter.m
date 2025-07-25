@@ -8,7 +8,7 @@
 
 #import "RangersRouter.h"
 #import "BDTrackerCoreConstants.h"
-#import "BDAutoTrackIdentifier.h"
+#import "NSDictionary+VETyped.h"
 #import "BDAutoTrack+Private.h"
 
 @implementation RangersRouting
@@ -21,7 +21,7 @@
     RangersRouting *routing = [RangersRouting new];
     routing.service = service;
     routing.appId = appId;
-    routing.parameters = parameters;
+    routing.parameters = [parameters copy];
     return routing;
 }
 
@@ -34,6 +34,8 @@
 
 
 
+
+#import "BDAutoTrackRegisterRequest.h"
 
 @implementation RangersRouter {
     
@@ -56,24 +58,30 @@ NSMutableDictionary *g_ssid_by_uuid;
 
     if ([routing.service isEqualToString:@"ssid"]) {
         
-        
+        id uuid = [routing.parameters objectForKey:kBDAutoTrackEventUserID];
+        NSString *uuid_str = @"";
+        if ([uuid isKindOfClass:NSString.class]) {
+            uuid_str = uuid;
+        }
         
         NSString *existsSSID;
         @synchronized (g_ssid_by_uuid) {
             id dataByAppID = [g_ssid_by_uuid objectForKey:routing.appId];
-            existsSSID = [dataByAppID objectForKey:routing.parameters];
+            existsSSID = [dataByAppID objectForKey:uuid_str];
         }
         if ([existsSSID length] > 0) {
             return existsSSID;
         }
         
-        NSString *userUniqueID = nil;
-        if ([routing.parameters isKindOfClass:NSString.class]) {
-            userUniqueID = routing.parameters;
-        }
+        BDAutoTrackRegisterRequest *request =  [[BDAutoTrackRegisterRequest alloc] initWithAppID:routing.appId];
+        request.requestType = BDAutoTrackRequestURLRegister;
+
+        BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:request.appID];
         
-        NSString *ssid = [[BDAutoTrack trackWithAppID:routing.appId].identifier synchronousfetchSSID:userUniqueID];
-        if ([ssid length] > 0) {
+        RL_INFO(tracker,@"[Network]",@"FIX SSID when uploading...");
+        id JSON = [request syncRegister:routing.parameters];
+        NSString *ssid = [JSON vetyped_stringForKey:kBDAutoTrackSSID];
+        if ([ssid isKindOfClass:NSString.class] && [ssid length] > 0) {
             @synchronized (g_ssid_by_uuid) {
                 NSMutableDictionary * dataByAppID = [g_ssid_by_uuid objectForKey:routing.appId];
                 if (!dataByAppID) {
@@ -85,6 +93,7 @@ NSMutableDictionary *g_ssid_by_uuid;
             return ssid;
         }
         return nil;
+        
     }
     
     return nil;

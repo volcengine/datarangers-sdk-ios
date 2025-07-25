@@ -20,12 +20,10 @@ BDAutoTrackBatchItem *bd_batchPackRawTracks(NSArray *rawTracks,
     NSMutableArray<NSString *> *trackIDs = [NSMutableArray new];
 
     for (NSDictionary *track in rawTracks) {
-        /// must be dict
         if (![track isKindOfClass:[NSDictionary class]]) {
             continue;
         }
         NSString *trackID = [track vetyped_stringForKey:kBDAutoTrackTableColumnTrackID];
-        /// track ID is must
         if (trackID.length < 1) {
             continue;
         }
@@ -33,7 +31,6 @@ BDAutoTrackBatchItem *bd_batchPackRawTracks(NSArray *rawTracks,
         NSString *sessionID = [track vetyped_stringForKey:kBDAutoTrackEventSessionID] ?: @"";
         NSMutableDictionary *t = [track mutableCopy];
         [t removeObjectForKey:kBDAutoTrackTableColumnTrackID];
-        /// terminate 只有在结束后才发送，占位terminate不发送
         if (![tableName isEqualToString:BDAutoTrackTableTerminate]
             || ![currentSession isEqualToString:sessionID]) {
             [tracks addObject:t];
@@ -48,10 +45,6 @@ BDAutoTrackBatchItem *bd_batchPackRawTracks(NSArray *rawTracks,
     return item;
 }
 
-/// 将表数据聚合封装成 BDAutoTrackBatchData
-/// @param allTracks <#allTracks description#>
-/// @param maxCountPerTask <#maxCountPerTask description#>
-/// @return 封装后的 BDAutoTrackBatchData
 NSArray *bd_batchPackAllTracks(NSDictionary<NSString *, NSArray *> *allTracks,
                                                               NSUInteger maxCountPerTask) {
     NSString *sessionID = [BDAutoTrackSessionHandler sharedHandler].sessionID;
@@ -60,7 +53,6 @@ NSArray *bd_batchPackAllTracks(NSDictionary<NSString *, NSArray *> *allTracks,
         NSArray *rawTracks = [allTracks objectForKey:tableName];
         maxEventCount = MAX(maxEventCount, rawTracks.count);
     }
-    /// 只取200个
     NSMutableDictionary *currentTrackData = [NSMutableDictionary new];
     NSMutableDictionary *currentTrackID = [NSMutableDictionary new];
     for (NSString *tableName in allTracks.allKeys) {
@@ -107,7 +99,8 @@ NSArray *bd_batchPackAllTracksSplitByUUID(NSDictionary<NSString *, NSArray *> *a
                 continue;
             }
             
-            NSString *uuid = [track objectForKey:@"user_unique_id"] ?: [NSNull null];
+            NSString *uuid = [track objectForKey:kBDAutoTrackEventUserID] ?: [NSNull null];
+            NSString *uuidType = [track objectForKey:kBDAutoTrackEventUserIDType];
             BDAutoTrackBatchData *batch = [tracksByUUID objectForKey:uuid];
             
             if (batch.maxEventCount == maxCountPerTask) {
@@ -119,6 +112,7 @@ NSArray *bd_batchPackAllTracksSplitByUUID(NSDictionary<NSString *, NSArray *> *a
                 batch.tempTrackIDs = [NSMutableDictionary new];;
                 batch.maxEventCount = 0;
                 batch.userUniqueID = uuid;
+                batch.userUniqueIDType = uuidType;
                 [tracksByUUID setValue:batch forKey:uuid];
             }
             if (![batch.tempTrackDatas objectForKey:tableName]) {
@@ -134,6 +128,11 @@ NSArray *bd_batchPackAllTracksSplitByUUID(NSDictionary<NSString *, NSArray *> *a
                     batch.ssID = ssid;
                 }
             }
+            
+            if ([uuidType isKindOfClass:[NSString class]]) {
+                batch.userUniqueIDType = uuidType;
+            }
+            
 
             [[batch.tempTrackDatas objectForKey:tableName] addObject:track];
             [[batch.tempTrackIDs objectForKey:tableName] addObject:trackID];
@@ -145,7 +144,6 @@ NSArray *bd_batchPackAllTracksSplitByUUID(NSDictionary<NSString *, NSArray *> *a
     [tracksByUUID enumerateKeysAndObjectsUsingBlock:^(id  _Nonnull key, BDAutoTrackBatchData*  _Nonnull batch, BOOL * _Nonnull stop) {
         batch.sendingTrackData = [batch.tempTrackDatas copy];
         batch.sendingTrackID = [batch.tempTrackIDs copy];
-        RL_DEBUG(@"[Packer] pack [UUID: %@] => %d", key, batch.maxEventCount);
     }];
     
     return [tracksByUUID allValues];

@@ -12,12 +12,14 @@
 NS_ASSUME_NONNULL_BEGIN
 
 
-
+@class BDAutoTrack;
 @interface RangersLogObject : NSObject
 
-@property (nonatomic) RANGERS_LOG_FLAG  flag;
+@property (nonatomic) VETLOG_FLAG  flag;
 
 @property (nonatomic) NSTimeInterval    timestamp;
+
+@property (nonatomic, copy) NSString *  appId;
 
 @property (nonatomic, copy) NSString *  module;
 
@@ -31,6 +33,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 
 @protocol RangersLogger <NSObject>
+
+@property (nonatomic, weak) BDAutoTrack *tracker;
 
 @required
 
@@ -51,17 +55,23 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface RangersLogManager : NSObject
 
-@property (class) RANGERS_LOG_LEVEL logLevel;
+@property (nonatomic, weak) BDAutoTrack *tracker;
 
-+ (void)enableModule:(NSString *)appId;
+@property (nonatomic, assign) VETLOG_LEVEL logLevel;
 
-+ (void)log:(RangersLogObject *)log;
+- (void)log:(RangersLogObject *)log;
 
-+ (void)addLogger:(id<RangersLogger>)logger;
+- (void)addLogger:(id<RangersLogger>)logger;
 
-+ (void)removeLogger:(id<RangersLogger>)logger;
+- (void)removeLogger:(id<RangersLogger>)logger;
 
-+ (void)removeAllLoggers;
+- (void)removeAllLoggers;
+
+- (NSArray<RangersLogger> *)loggers;
+
++ (void)registerLogger:(Class)cls;
+
++ (NSArray<Class> *)registerLoggerClasses;
 
 
 @end

@@ -40,15 +40,12 @@ FOUNDATION_EXTERN NSString * const BDAutoTrackServiceNameFilter;
 - (void)sendEvent:(NSDictionary *)event key:(NSString *)key;
 @end
 
-/// 遵循此协议的类
-/// 1. Log子库的RealTimeService
-/// 2. ET/Log的ETService
 @protocol BDAutoTrackLogService <BDAutoTrackService, BDAutoTrackCanSendEvent>
 
 @end
 
 @protocol BDAutoTrackFilterService <BDAutoTrackService>
-- (nullable NSDictionary *)filterEvent:(NSDictionary *)event;
+- (nullable NSDictionary *)filterEvents:(NSDictionary *)event;
 - (void)updateBlockList:(NSDictionary *)eventList save:(BOOL)save;
 @end
 

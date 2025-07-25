@@ -16,6 +16,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, assign) BOOL bd_pickJSInjected;
 
+- (void)bd_pickerViewStart;
+
 - (nullable AppLogPickerView *)bd_pickerView;
 
 @end

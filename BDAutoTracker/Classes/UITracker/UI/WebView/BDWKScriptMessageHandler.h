@@ -10,7 +10,6 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-
 @interface BDWKScriptMessageHandler : NSObject<WKScriptMessageHandler>
 
 @property (nonatomic, copy, readonly) NSString *messageName;

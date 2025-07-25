@@ -15,8 +15,11 @@
 #import "BDAutoTrackUtility.h"
 #import "BDAutoTrackMacro.h"
 #import "BDAutoTrack+Private.h"
+#import "BDAutoTrack+Extension.h"
 #import "BDCommonEnumDefine.h"
+#import "BDAutoTrackEventUntils.h"
 #import "RangersLog.h"
+#import "BDTrackerErrorBuilder.h"
 
 static NSString *const kExtraTableName = @"kTableName";
 
@@ -45,7 +48,8 @@ static NSString *const kExtraTableName = @"kTableName";
 
 - (void)clearDatabase
 {
-    RL_DEBUG(self.appID, @"[PROCESS] DELETE ALL !!!");
+    BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:self.appID];
+    RL_WARN(tracker,@"[Event]",@"DELETE ALL !!!");
     [self.tables enumerateKeysAndObjectsUsingBlock:^(NSString * _Nonnull key, BDAutoTrackBaseTable * _Nonnull obj, BOOL * _Nonnull stop) {
         [obj deleteAll];
     }];
@@ -78,16 +82,27 @@ static NSString *const kExtraTableName = @"kTableName";
     self.extraTable = [[BDAutoTrackBaseTable alloc] initWithTableName:BDAutoTrackTableExtraEvent databaseQueue:queue];;
 }
 
-#pragma mark - service API
-/// caller: - [BDAutoTrackBatchService processBatchData]
-/// @discussion 聚合所有表(self.tables)中的埋点数据（除了profile表）。用于BatchService上报
-/// @return { table_name: [tracks_of_the_table] }
-- (NSDictionary<NSString *, NSArray<NSDictionary *> *> *)allTracksForBatchReport {
+
+- (NSUInteger)count
+{
+    __block NSUInteger count = 0;
+    BDSemaphoreLock(self.semaphore);
+    [self.tables enumerateKeysAndObjectsUsingBlock:^(NSString *tableName, BDAutoTrackBaseTable *table, BOOL *stop) {
+        if (![tableName isEqualToString:BDAutoTrackTableProfile]) {  // Profile表中的事件通过ProfileReporter上报，不通过Batch上报
+            NSUInteger c = [table count];
+            count += c;
+        }
+    }];
+    BDSemaphoreUnlock(self.semaphore);
+    return count;
+}
+
+- (NSDictionary<NSString *, NSArray<NSDictionary *> *> *)allTracksForBatchReport:(NSDictionary *)options {
     BDSemaphoreLock(self.semaphore);
     NSMutableDictionary<NSString *, NSArray *> *allEvents = [NSMutableDictionary new];
     [self.tables enumerateKeysAndObjectsUsingBlock:^(NSString *tableName, BDAutoTrackBaseTable *table, BOOL *stop) {
         if (![tableName isEqualToString:BDAutoTrackTableProfile]) {  // Profile表中的事件通过ProfileReporter上报，不通过Batch上报
-            NSArray *tracks = [table allTracks];
+            NSArray *tracks = [table allTracks:options];
             if (tracks.count > 0) {
                 [allEvents setValue:tracks forKey:tableName];
             }
@@ -98,40 +113,61 @@ static NSString *const kExtraTableName = @"kTableName";
     return allEvents;
 }
 
-/// caller: - [BDAutoTrackProfileReporter sendProfileTrack]
-/// @discussion 返回Profile表中的事件。用于Profile事件上报。
-/// @return [tracks_of_profile_table]
 - (NSArray<NSDictionary *> *)profileTracks {
     NSArray *result;
     BDSemaphoreLock(self.semaphore);
-    result = [self.tables[BDAutoTrackTableProfile] allTracks];
+    result = [self.tables[BDAutoTrackTableProfile] allTracks:nil];
     BDSemaphoreUnlock(self.semaphore);
 
     return result;
 }
 
-- (void)insertTable:(NSString *)tableName track:(NSDictionary *)track trackID:(NSString *)trackID {
-    // 发送埋点验证请求
+- (void)insertTable:(NSString *)tableName
+              track:(NSDictionary *)track
+            trackID:(nullable NSString *)trackID
+            options:(nullable NSDictionary *)options {
     id<BDAutoTrackLogService> log = (id<BDAutoTrackLogService>)bd_standardServices(BDAutoTrackServiceNameLog, self.appID);
     if ([log respondsToSelector:@selector(sendEvent:key:)]) {
         [log sendEvent:track key:tableName];
     }
     
-    // 获取table对象
     BDSemaphoreLock(self.semaphore);
     BDAutoTrackBaseTable *table = [self.tables objectForKey:tableName];
     if (!table) {
         table = [[BDAutoTrackBaseTable alloc] initWithTableName:tableName databaseQueue:self.databaseQueue];
         [self.tables setValue:table forKey:tableName];
-        [self.extraTable insertTrack:@{kExtraTableName:tableName} trackID:tableName];
+        [self.extraTable insertTrack:@{kExtraTableName:tableName} trackID:tableName withError:nil];
     }
     
-    // INSERT track数据到数据库
-    BOOL success = [table insertTrack:track trackID:trackID];
+    NSError *err = nil;
+    BOOL success = [table insertTrack:track trackID:trackID options:options withError:&err]; 
+    BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:self.appID];
+    NSString *session = [track objectForKey:kBDAutoTrackEventSessionID];
+    
+    BOOL isTerminate = [tableName isEqualToString:@"terminate"];
     if (!success) {
-        RL_ERROR(self.appID, @"[PROCESS] storing failure.");
+        RL_ERROR(tracker, @"Event",@"storing failure.");
     } else {
-        RL_DEBUG(self.appID, @"[PROCESS] storing successful.")
+        RL_DEBUG(tracker, @"Event",@"storing successful.");
+    }
+    
+    if (tracker && tracker.eventBlock) {
+        BDAutoTrackEventStatus status = success ? BDAutoTrackEventStatusSaved : BDAutoTrackEventStatusSaveFailed;
+        NSMutableDictionary *info = [NSMutableDictionary new];
+        [info addEntriesFromDictionary:track];
+        [info setValue:trackID forKey:kBDAutoTrackTableColumnTrackID];
+        
+        NSString *event = [track objectForKey:@"event"];
+        BDAutoTrackEventAllType type = bd_get_event_alltype(tableName, event);
+        if (!event) {
+            if (type == BDAutoTrackEventAllTypeLaunch) {
+                event = @"$launch";
+            } else if (type == BDAutoTrackEventAllTypeTerminate) {
+                event = @"$terminate";
+            }
+        }
+        
+        tracker.eventBlock(status, type, event, info);
     }
     BDSemaphoreUnlock(self.semaphore);
 }
@@ -142,12 +178,33 @@ static NSString *const kExtraTableName = @"kTableName";
     }
     BDSemaphoreLock(self.semaphore);
     __block NSUInteger count = 0;
+    BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:self.appID];
     [trackIDs enumerateKeysAndObjectsUsingBlock:^(NSString *tableName, NSArray *trackID, BOOL *stop) {
         BDAutoTrackBaseTable *table = [self.tables objectForKey:tableName];
         [table removeTracksByID:trackID];
+        RL_DEBUG(tracker, @"Event",@"remove %@ [%d]", tableName,trackID.count);
         count ++;
     }];
-    RL_DEBUG(self.appID, @"[PROCESS] Remove tracks [%d]", count);
+    
+    
+    BDSemaphoreUnlock(self.semaphore);
+}
+
+- (void)downgradeTracks:(NSDictionary<NSString *, NSArray *> *)trackIDs {
+    if (![trackIDs isKindOfClass:[NSDictionary class]] || trackIDs.count < 1) {
+        return;
+    }
+    BDSemaphoreLock(self.semaphore);
+    __block NSUInteger count = 0;
+    BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:self.appID];
+    [trackIDs enumerateKeysAndObjectsUsingBlock:^(NSString *tableName, NSArray *trackID, BOOL *stop) {
+        BDAutoTrackBaseTable *table = [self.tables objectForKey:tableName];
+        [table downgradeTracksByID:trackID];
+        RL_DEBUG(tracker, @"Event",@"downgrade priority %@ [%d]", tableName,trackID.count);
+        count ++;
+    }];
+    
+    
     BDSemaphoreUnlock(self.semaphore);
 }
 
@@ -159,9 +216,6 @@ static NSString *const kExtraTableName = @"kTableName";
     return tableNames;
 }
 
-/// After the events in the database file is comsumed, however the
-/// file size may not change.
-/// This function decreases database file size using sqlite's vacuum technique.
 - (void)vacuumDatabase {
     BDSemaphoreLock(self.semaphore);
     [self.databaseQueue inDatabase:^(BDAutoTrackDatabase *db) {
@@ -170,7 +224,6 @@ static NSString *const kExtraTableName = @"kTableName";
     BDSemaphoreUnlock(self.semaphore);
 }
 
-/// will not in allTable
 - (BDAutoTrackBaseTable *)ceateTableWithName:(NSString *)tableName {
     return [[BDAutoTrackBaseTable alloc] initWithTableName:tableName databaseQueue:self.databaseQueue];
 }
@@ -196,36 +249,35 @@ BDAutoTrackDatabaseService * bd_databaseServiceForAppID(NSString *appID) {
 void bd_databaseInsertTrack(NSString *tableName,
                             NSDictionary *track,
                             NSString *trackID,
-                            NSString *appID) {
+                            NSString *appID,
+                            NSDictionary *options) {
     
-    //
     BDAutoTrack *tracker = [[BDAutoTrackServiceCenter defaultCenter] serviceForName:BDAutoTrackServiceNameTracker appID:appID];
-    
+    NSString *event = [track objectForKey:@"event"];
     if (tracker
         && tracker.eventHandler) {
         
         BDAutoTrackEventPolicy policy = BDAutoTrackEventPolicyAccept;
         
-        NSMutableDictionary *properties = nil;
-        NSString *event = [track objectForKey:@"event"];
+        NSMutableDictionary *properties = [NSMutableDictionary dictionary];
+        [properties addEntriesFromDictionary:[track objectForKey:@"params"]?:@{}];
+        
         NSUInteger eventType = 0;
     
         if ([tableName isEqualToString:@"launch"]) {
             event = @"$launch";
-            eventType = (1 << 2);
-        }else if ([tableName isEqualToString:@"terminate"]) {\
+            eventType = BDAutoTrackDataTypeLaunch;
+        }else if ([tableName isEqualToString:@"terminate"]) {
             event = @"$terminate";
-            eventType = (1 << 3);
+            eventType = BDAutoTrackDataTypeTerminate;
         } else {
-            properties = [NSMutableDictionary dictionary];
-            [properties addEntriesFromDictionary:[track objectForKey:@"params"]?:@{}];
-            
             if ([event isEqualToString:@"bav2b_click"]) {
                 eventType = BDAutoTrackDataTypeClick;
             } else if ([event isEqualToString:@"bav2b_page"]) {
                 eventType = BDAutoTrackDataTypePage;
+            } else if ([event isEqualToString:@"$bav2b_page_leave"]) {
+                eventType = BDAutoTrackDataTypePageLeave;
             } else if ([event hasPrefix:@"__profile"]) {
-                [properties addEntriesFromDictionary:[track objectForKey:@"params"]?:@{}];
                 eventType = BDAutoTrackDataTypeProfile;
             } else {
                 eventType = BDAutoTrackDataTypeUserEvent;
@@ -233,7 +285,16 @@ void bd_databaseInsertTrack(NSString *tableName,
         }
         
         if (tracker.eventHandlerTypes & eventType) {
-            policy = tracker.eventHandler(eventType, event, properties);
+            NSMutableDictionary *basicData = [NSMutableDictionary dictionary];
+            [basicData setValue:[track valueForKey:kBDAutoTrackGlobalEventID] forKey:kBDAutoTrackGlobalEventID];
+            [basicData setValue:[track valueForKey:kBDAutoTrackLocalTimeMS] forKey:kBDAutoTrackLocalTimeMS];
+            [basicData setValue:[track valueForKey:kBDAutoTrackEventSessionID] forKey:kBDAutoTrackEventSessionID];
+            [basicData setValue:[track valueForKey:kBDAutoTrackEventUserID] forKey:kBDAutoTrackEventUserID];
+            [basicData setValue:[track valueForKey:kBDAutoTrackEventUserIDType] forKey:kBDAutoTrackEventUserIDType];
+            [basicData setValue:[track valueForKey:kBDAutoTrackSSID] forKey:kBDAutoTrackSSID];
+            [basicData setValue:[track valueForKey:kBDAutoTrackABSDKVersion] forKey:kBDAutoTrackABSDKVersion];
+
+            policy = tracker.eventHandler(eventType, event, properties, basicData);
             
             if (properties) {
                 NSMutableDictionary *modifyed = [track mutableCopy];
@@ -243,16 +304,50 @@ void bd_databaseInsertTrack(NSString *tableName,
         }
         
         if (policy == BDAutoTrackEventPolicyDeny) {
-            RL_WARN(appID, @"[PROCESS] terminte due to EVENT HANDLER USE POLICY DENY");
+            RL_WARN(tracker, @"Event",@"terminte due to EVENT HANDLER USE POLICY DENY");
             return;
         }
     }
     
+    if (!event && [tableName isEqualToString:@"launch"]) {
+        event = @"$launch";
+    }
+    if (!event && [tableName isEqualToString:@"terminate"]) {
+        event = @"$terminate";
+    }
     
-    RL_DEBUG(appID, @"[PROCESS] storing %@ %@", tableName, bd_JSONRepresentation(track));
+    if (!trackID) {
+        trackID = [[NSUUID UUID] UUIDString];
+    }
+    if (tracker && tracker.eventBlock) {
+        NSMutableDictionary *info = [NSMutableDictionary new];
+        [info addEntriesFromDictionary:track];
+        [info setValue:trackID forKey:kBDAutoTrackTableColumnTrackID];
+        tracker.eventBlock(BDAutoTrackEventStatusCreated, bd_get_event_alltype(tableName, event), event, info);
+    }
+    
+    RL_DEBUG(tracker, @"Event",@"storing %@ (%@) \r\n%@", tableName,event, [track objectForKey:@"params"]);
+        
+    if ([tableName isEqualToString:@"launch"]
+        || [tableName isEqualToString:@"terminate"]) {
+        if ([track.allKeys containsObject:@"params"]) {
+            NSMutableDictionary *modified = [track mutableCopy];
+            [modified removeObjectForKey:@"params"];
+            track = [modified copy];
+        }
+    } else if ([tableName isEqualToString:@"profile"]) {
+        NSMutableDictionary *modified = [track mutableCopy];
+        NSMutableDictionary *modifiedParams = [NSMutableDictionary dictionaryWithDictionary:(track[@"params"]?:@{})];
+        [modifiedParams removeObjectForKey:kBDAutoTrackAPPVersion2];
+        [modifiedParams removeObjectForKey:kBDAutoTrackScreenOrientation];
+        modified[@"params"] = modifiedParams;
+        track = [modified copy];
+    }
+    
     [bd_databaseServiceForAppID(appID) insertTable:tableName
                                              track:track
-                                           trackID:trackID];
+                                           trackID:trackID
+                                           options:options];
 
 }
 
@@ -261,14 +356,19 @@ void bd_databaseRemoveTracks(NSDictionary<NSString *, NSArray *> *trackIDs,
     [bd_databaseServiceForAppID(appID) removeTracks:trackIDs];
 }
 
+
+void bd_databaseDowngradeTracks(NSDictionary<NSString *, NSArray *> *trackIDs,
+                             NSString *appID) {
+    [bd_databaseServiceForAppID(appID) downgradeTracks:trackIDs];
+}
+
 BDAutoTrackBaseTable * bd_databaseCeateTable(NSString *tableName, NSString *appID) {
     return [bd_databaseServiceForAppID(appID) ceateTableWithName:tableName];
 }
 
 #pragma mark - database file name and path
 static NSString * bd_databaseFileComponent(void) {
-//    return @"bytedance_auto_track.sqlite";
-    return @"cc217ca5c7e3d6e933927ae2e2569a6e";  // md5("bytedance_auto_track.sqlite")
+    return @"cc217ca5c7e3d6e933927ae2e2569a6e";
 }
 
 NSString *bd_databaseFilePathForAppID(NSString *appID) {
@@ -276,5 +376,3 @@ NSString *bd_databaseFilePathForAppID(NSString *appID) {
     NSString *path = [dir stringByAppendingPathComponent:bd_databaseFileComponent()];
     return path;
 }
-
-

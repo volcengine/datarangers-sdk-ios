@@ -115,7 +115,6 @@
     NSMutableDictionary *trackInfo = [page bd_pageTrackInfo];
     [trackInfo addEntriesFromDictionary:[view bd_trackInfo]];
 
-    /// add locationInView
     CGPoint point = [self locationInView:view];
     bd_ui_trackAddRectPoint(view.frame, point, trackInfo);
     bd_ui_trackEventWithData(BDAutoTrackEventNameGesture, trackInfo);

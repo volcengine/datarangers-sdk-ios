@@ -11,7 +11,6 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// to provide host URLs for a specific vendor
 @protocol BDAutoTrackURLHostItemProtocol <NSObject>
 
 @required

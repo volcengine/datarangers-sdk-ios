@@ -19,8 +19,8 @@
 #import "BDAutoTrackInternalHandler.h"
 
 #import "RangersLog.h"
-
-/// rangersapplog.xxx://rangersapplog/picker?aid=xxx
+#import "BDAutoTrack+Private.h"
+#import "BDAutoTrackUI.h"
 
 static NSString * const BDPickerScheme = @"rangersapplog";
 static NSString * const BDPickerSchemePath = @"picker";
@@ -33,31 +33,28 @@ static NSString * const BDPickerSchemePath = @"picker";
 
 - (BOOL)handleInternalURL:(NSURL *)URL appID:(NSString *)appID scene:(id)scene {
     
-    RL_DEBUG(appID, @"[URL_Handler] handleInternalURL:appID:scene start...")
+    BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:appID];
     if (!URL) {
         return NO;
     }
-    NSString *scheme = URL.scheme;
-    if (![scheme.lowercaseString hasPrefix:BDPickerScheme]) {
-        RL_DEBUG(appID, @"[URL_Handler] handleInternalURL:appID:scene terminate due to INVALID SCHEMA. (%@)", scheme);
-        return NO;
-    }
-
     NSString *host = URL.host;
     if (![host.lowercaseString isEqualToString:BDPickerScheme]) {
-        RL_DEBUG(appID, @"[URL_Handler] handleInternalURL:appID:scene terminate due to INVALID HOST. (%@)", host);
+        RL_DEBUG(tracker, @"OPEN_URL", @"handleInternalURL:appID:scene terminate due to INVALID HOST. (%@)", host);
+        [BDAutoTrackUI toast:@"OPEN_URL terminate due to invalid host."];
         return NO;
     }
     NSString *path = URL.path;
     if (![path.lowercaseString containsString:@"picker"]) {
-        RL_DEBUG(appID, @"[URL_Handler] handleInternalURL:appID:scene terminate due to INVALID PATH. (%@)", path);
+        RL_DEBUG(tracker, @"OPEN_URL", @"handleInternalURL:appID:scene terminate due to INVALID PATH. (%@)", path);
+        [BDAutoTrackUI toast:@"OPEN_URL terminate due to invalid path."];
         return NO;
     }
     
     NSDictionary *query = bd_dictionaryFromQuery(URL.query);
     NSString *queryAppID = [query vetyped_stringForKey:kBDAutoTrackAPPID];
     if (![queryAppID isEqualToString:appID]) {
-        RL_DEBUG(appID, @"[URL_Handler] handleInternalURL:appID:scene terminate due to INVALID APPID. (%@)", queryAppID);
+        RL_DEBUG(tracker, @"OPEN_URL", @"handleInternalURL:appID:scene terminate due to INVALID APPID. (%@)", queryAppID);
+        [BDAutoTrackUI toast:@"OPEN_URL terminate due to invalid appId."];
         return NO;
     }
     
@@ -65,22 +62,25 @@ static NSString * const BDPickerSchemePath = @"picker";
     CFTimeInterval now = bd_currentIntervalValue();
     CFTimeInterval expectedInterval = 60.0;
     if (now - queryTime > expectedInterval) {
-        RL_DEBUG(appID, @"[URL_Handler] handleInternalURL:appID:scene terminate due to TIMEOUT.");
+        RL_DEBUG(tracker, @"OPEN_URL", @"handleInternalURL:appID:scene terminate due to TIMEOUT.");
+        [BDAutoTrackUI toast:@"OPEN_URL terminate due to time out."];
         return NO;
     }
     
     NSString *qr = [query vetyped_stringForKey:@"qr_param"];
     if (qr.length < 1) {
-        RL_DEBUG(appID, @"[URL_Handler] handleInternalURL:appID:scene terminate due to INVALID qr_param.");
+        RL_DEBUG(tracker, @"OPEN_URL", @"handleInternalURL:appID:scene terminate due to INVALID qr_param.");
+        [BDAutoTrackUI toast:@"OPEN_URL terminate due to invalid param."];
         return NO;
     }
     
     NSString *urlPrefix = [query vetyped_stringForKey:@"url_prefix"];
-    bd_settingsServiceForAppID(appID).pickerHost = urlPrefix;
+    [BDAutoTrack trackWithAppID:appID].localConfig.pickerHost= urlPrefix;
     
     NSString *type = [query vetyped_stringForKey:@"type"].lowercaseString;
     if (type == nil) {
-        RL_DEBUG(appID, @"[URL_Handler] handleInternalURL:appID:scene terminate due to INVALID type.");
+        RL_DEBUG(tracker, @"OPEN_URL", @"handleInternalURL:appID:scene terminate due to INVALID type.");
+        [BDAutoTrackUI toast:@"OPEN_URL terminate due to invalid type."];
         return NO;
     }
     
@@ -93,9 +93,9 @@ static NSString * const BDPickerSchemePath = @"picker";
     BDSemaphoreUnlock(self.semaphore);
     
     if (!handled) {
-        RL_DEBUG(appID, @"[URL_Handler] handleInternalURL:appID:scene failure.");
+        RL_DEBUG(tracker, @"OPEN_URL", @"handleInternalURL:appID:scene failure.");
     } else {
-        RL_DEBUG(appID, @"[URL_Handler] handleInternalURL:appID:scene successful.");
+        RL_DEBUG(tracker, @"OPEN_URL", @"handleInternalURL:appID:scene successful.");
     }
     
     return handled;

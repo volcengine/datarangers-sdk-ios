@@ -32,32 +32,33 @@ static NSString *rangers_console_dateformat(NSTimeInterval ts)
     return [NSString stringWithFormat:@"%02ld:%02ld:%02ld:%03d",(long)components.hour,(long)components.minute,(long)components.second, milliseconds];
 }
 
-static void rangers_console_log(RangersLogObject *log)
+static NSString* rangers_console_log(RangersLogObject *log)
 {
     NSMutableString *output = [NSMutableString new];
     NSString *datePart = rangers_console_dateformat(log.timestamp);
     [output appendString:datePart];
     
     NSString *filterTag = @"[Rangers]";
-    if ([log.module length] > 0) {
-        filterTag = [NSString stringWithFormat:@"[Rangers:%@]",log.module];
+    if ([log.appId length] > 0) {
+        filterTag = [NSString stringWithFormat:@"[Rangers:%@]",log.appId];
     }
     [output appendFormat:@" %@", filterTag];
     
-    NSString *flag = @"D";
-    if (log.flag == RANGERS_LOG_FLAG_ERROR) {
-        flag = @"E";
-    } else if (log.flag == RANGERS_LOG_FLAG_WARNING) {
-        flag = @"W";
+    NSString *flag = @"DEBUG";
+    if (log.flag == VETLOG_FLAG_INFO) {
+        flag = @" INFO";
+    } else if (log.flag == VETLOG_FLAG_WARN) {
+        flag = @" WARN";
+    } else if (log.flag == VETLOG_FLAG_ERROR) {
+        flag = @"ERROR";
     }
     
     [output appendFormat:@"<%@>",flag];
-//    [output appendFormat:@"(%@:%ld)",log.file, log.line];
+    if (log.module.length > 0) {
+        [output appendFormat:@"[%@]",log.module];
+    }
     [output appendFormat:@" %@",log.message?:@""];
-    
-    fprintf(stdout, "%s", [output UTF8String]);
-    fprintf(stdout, "\r\n");
-    fflush(stdout);
+    return output;
 }
 
 
@@ -65,10 +66,18 @@ static void rangers_console_log(RangersLogObject *log)
 
 @implementation RangersConsoleLogger
 
-
++ (void)load
+{
+    [RangersLogManager registerLogger:[self class]];
+}
 
 - (void)log:(nonnull RangersLogObject *)log {
-    rangers_console_log(log);
+    NSLog(@"%@",rangers_console_log(log));
+}
+
++ (NSString *)logToString:(RangersLogObject *)log
+{
+    return rangers_console_log(log);
 }
 
 - (nonnull dispatch_queue_t)queue {

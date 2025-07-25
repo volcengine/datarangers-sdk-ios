@@ -9,7 +9,6 @@
 #import <Foundation/Foundation.h>
 
 NS_ASSUME_NONNULL_BEGIN
-/// 析构时自动munmap
 @interface BDAutoTrackMMap : NSObject
 
 @property (nonatomic, assign, readonly, nullable) void *memory;
@@ -19,15 +18,12 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)init __attribute__((unavailable()));
 - (instancetype)initWithPath:(NSString *)path;
 
-/// 执行mmap
 - (void *)mmapWithSize:(size_t)mapSize;
 
-/// 执行munmap
 - (void)munmap;
 
 - (BOOL)isMapped;
 
-/// 先munmap，再删除MMAP文件
 - (void)destroy;
 
 @end

@@ -47,6 +47,11 @@
     [self.decorators setValue:decorator forKey:key];
 }
 
+- (void)removeDecoratorForSelector:(SEL)aSelector {
+    NSString *key = NSStringFromSelector(aSelector);
+    [self.decorators setValue:nil forKey:key];
+}
+
 - (BDAutoTrackDecorator *)decoratorForSelector:(SEL)aSelector {
     if (aSelector == nil) {
         return nil;

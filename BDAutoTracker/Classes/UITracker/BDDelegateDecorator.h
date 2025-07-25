@@ -19,6 +19,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)decoratorForDelegate:(id)delegate;
 
 - (void)setDecorator:(BDAutoTrackDecorator *)decorator forSelector:(SEL)aSelector;
+- (void)removeDecoratorForSelector:(SEL)aSelector;
 - (nullable BDAutoTrackDecorator *)decoratorForSelector:(SEL)aSelector;
 - (void)bd_decoratorMark;
 

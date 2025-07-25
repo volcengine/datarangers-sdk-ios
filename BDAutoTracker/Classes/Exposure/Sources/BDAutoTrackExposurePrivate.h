@@ -16,7 +16,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, assign) CGFloat areaRatio;
 
+@property (nonatomic, assign) NSInteger stayTriggerTime;
+
 @property (nonatomic, copy) NSNumber *visualDebug;
+
+@property (nonatomic, copy) BDAutoTrackExposureBlock exposureBlock;
 
 - (BOOL)visualDiagnosisEnabled;
 

@@ -8,9 +8,6 @@
 #import "AppDelegate.h"
 @import RangersAppLog;
 
-
-
-
 @interface AppDelegate ()
 @end
 
@@ -20,41 +17,31 @@
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     // Override point for customization after application launch.
     
-    BDAutoTrackConfig *config =[BDAutoTrackConfig configWithAppID:@"#YOUR_APP_ID#" launchOptions:launchOptions];
+    BDAutoTrackConfig *config =[BDAutoTrackConfig configWithAppID:@"your_appid" launchOptions:launchOptions];
     config.appName = @"applog_oc_demo";
     
     config.showDebugLog = YES;  //开启命令行日志
     config.logNeedEncrypt = NO; //关闭加密
-    
     //config settings
 
     config.serviceVendor = BDAutoTrackServiceVendorPrivate;
     
-    
-    //[BDAutoTrack sharedTrack] init
     [BDAutoTrack sharedTrackWithConfig:config];
     
-    [BDAutoTrack setRequestHostBlock:^NSString * _Nullable(BDAutoTrackServiceVendor  _Nonnull vendor, BDAutoTrackRequestURLType requestURLType) {
-        return @"#YOUR_HOST#";
-    }];
-    
-    //[BDAutoTrack sharedTrack] start Track
-    
+    config.serviceVendor = BDAutoTrackServiceVendorPrivate;
+    BDAutoTrackRequestHostBlock block =
+         ^NSString *(BDAutoTrackServiceVendor vendor, BDAutoTrackRequestURLType requestURLType) {
+             // 火山云上报域名
+             return @"https://gator.volces.com";
+    };
+    [BDAutoTrack setRequestHostBlock:block];
+        
     [BDAutoTrack startTrack];
-    
     // set event handler
-    [[BDAutoTrack sharedTrack] setEventHandler:^BDAutoTrackEventPolicy(BDAutoTrackDataType type, NSString * _Nonnull event, NSMutableDictionary<NSString *,id> * _Nonnull properties) {
-        
-        if ([event isEqualToString:@"fisrt_event"]) {
-            [properties setValue:@"set_in_handler" forKey:@"extra"];
-        }
+    [[BDAutoTrack sharedTrack] setEventHandler:^BDAutoTrackEventPolicy(BDAutoTrackDataType type, NSString * _Nonnull event, NSMutableDictionary<NSString *,id> * _Nonnull properties, NSDictionary<NSString *,id> * _Nonnull basicData) {
+        [properties setValue:@"ddd" forKey:@"_additional"];
         return BDAutoTrackEventPolicyAccept;
-        
     } forTypes:BDAutoTrackDataTypeAll];
-
-    
-    
-    //
     
     return YES;
 }

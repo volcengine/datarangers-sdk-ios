@@ -11,7 +11,6 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// 提供JS调用部分Native接口的能力
 @interface BDAutoTrackScriptMessageHandler : NSObject <WKScriptMessageHandler>
 
 - (instancetype)init;

@@ -7,8 +7,6 @@
 //
 #import <Foundation/Foundation.h>
 
-//__FILE__, __LINE__, __FUNCTION__,
-
 #ifndef BDAutoTrackMacro_h
 #define BDAutoTrackMacro_h
 
@@ -32,4 +30,4 @@
 #define BDAutoTrackIsEmptyDictionary(dict) (!dict || ![dict isKindOfClass:[NSDictionary class]] || ((NSDictionary *)dict).count < 1)
 #endif
 
-#endif /* BDAutoTrackMacro_h */
+#endif

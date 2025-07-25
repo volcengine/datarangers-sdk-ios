@@ -10,8 +10,12 @@
 #import "RangersLogManager.h"
 
 NS_ASSUME_NONNULL_BEGIN
-
+@class BDAutoTrack;
 @interface RangersConsoleLogger : NSObject<RangersLogger>
+
+@property (nonatomic, weak) BDAutoTrack *tracker;
+
++ (NSString *)logToString:(RangersLogObject *)log;
 
 @end
 

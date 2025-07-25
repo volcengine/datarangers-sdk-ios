@@ -60,7 +60,7 @@
     }
     
     if (exp.properties && ![NSJSONSerialization isValidJSONObject:exp.properties]) {
-        RL_WARN([tracker appID], @"[Exposure] invalid properties when view is settings observable.");
+        RL_WARN(tracker, @"Exposure" ,@"invalid properties when view is settings observable.");
         exp.properties = @{@"$error_message":@"invalid properties"};
     }
     

@@ -59,6 +59,7 @@ static NSString *const kBDAutoTrackRealTimeServiceTimer    = @"kBDAutoTrackRealT
     }
     request = [[BDAutoTrackKeepRequest alloc] initWithService:self type:BDAutoTrackRequestURLSimulatorLog];
     self.request = request;
+    self.request.timeout = 5.0f;
     [self startTimer];
 }
 

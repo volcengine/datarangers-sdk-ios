@@ -9,9 +9,11 @@
 #import "BDAutoTrack+Private.h"
 #import "BDAutoTrack+Profile.h"
 #import "BDAutoTrackUtility.h"
+#import "BDAutoTrackRegisterService.h"
 #import "BDAutoTrackDataCenter.h"
 #import "BDTrackerCoreConstants.h"
 #import "BDAutoTrackProfileReporter.h"
+#import "BDAutoTrackEventCheck.h"
 #import <objc/runtime.h>
 
 static const NSTimeInterval profileExpireTimeRange = 60.0;
@@ -26,7 +28,6 @@ typedef enum : NSUInteger {
     BDProfileRequestTypeAppend
 } BDProfileRequestType;
 
-/// 用于ProfileSet请求的流量控制
 @interface BDProfileEntry : NSObject
 
 @property (strong, nonatomic) NSString *name;
@@ -47,8 +48,6 @@ typedef enum : NSUInteger {
     return self;
 }
 
-/// 在有效期内的profileEntry可能被限流（在用户、键、值三元素都相同的情况下）。在有效期外的不会被限流。
-/// @return 当前ProfileEntry是否在有效期内
 - (BOOL)remainsValid {
     if ([[NSDate date] timeIntervalSince1970] - self.timeSince1970 < profileExpireTimeRange) {
         return YES;  // if is within the time range, then is valid
@@ -61,9 +60,6 @@ typedef enum : NSUInteger {
     return [self.valueHash isEqualToString:[self.class calcValueHash:value]];
 }
 
-/// 数组类型的值可能比较占内存。因此设计了valueHash.
-/// @param value profile的值
-/// @return 哈希后的profile值
 + (NSString *)calcValueHash:(NSObject *)value {
     NSMutableString *content = [NSMutableString new];
     NSString *mangledValue;
@@ -100,22 +96,37 @@ typedef enum : NSUInteger {
 #pragma mark public
 
 - (void)profileSet:(NSDictionary *)profileDict {
+    if (self.showDebugLog) {
+        bd_checkProfileDictionary(self, profileDict);
+    }
     [self impl_profileSet:profileDict];
 }
 
 - (void)profileSetOnce:(NSDictionary *)profileDict {
+    if (self.showDebugLog) {
+        bd_checkProfileDictionary(self, profileDict);
+    }
     [self impl_profileSetOnce:profileDict];
 }
 
 - (void)profileUnset:(NSString *)profileName {
+    if (self.showDebugLog) {
+        bd_checkProfileName(self, profileName);
+    }
     [self impl_profileUnset:profileName];
 }
 
 - (void)profileIncrement:(NSDictionary *)profileDict {
+    if (self.showDebugLog) {
+        bd_checkProfileDictionary(self, profileDict);
+    }
     [self impl_profileIncrement:profileDict];
 }
 
 - (void)profileAppend:(NSDictionary *)profileDict {
+    if (self.showDebugLog) {
+        bd_checkProfileDictionary(self, profileDict);
+    }
     [self impl_profileAppend:profileDict];
 }
 
@@ -144,15 +155,17 @@ typedef enum : NSUInteger {
 - (BOOL)profileEvent:(NSString *)event params:(NSDictionary *)params {
     NSDictionary *trackData = @{kBDAutoTrackEventType:[event mutableCopy],
                                 kBDAutoTrackEventData:[params copy]};
-    [self.dataCenter trackProfileEventWithData:trackData];
+    
+    if (self.config.rollback) {
+        [self.dataCenter trackProfileEventWithData:trackData];
+    } else {
+        [self.eventGenerator trackEventType:BDAutoTrackTableProfile eventBody:trackData options:nil];
+    }
+   
     
     return YES;
 }
 
-/// 对profileDict做类型检查。值类型不合法的KV对会被移除。
-/// 类型合法的定义是字典的值的类型为 NSNumber | NSString | NSArray<NSString> 之一
-/// @param profileDict 需要做类型检查的ProfileDict。
-/// @return 类型合法的ProfileDict。
 - (NSMutableDictionary *)validateProfileDict:(NSDictionary *)profileDict {
     profileDict = [profileDict copy];
     NSMutableDictionary *validatedProfileDict = [NSMutableDictionary new];
@@ -160,13 +173,10 @@ typedef enum : NSUInteger {
     for (NSString *key in profileDict) {
         NSObject *value = profileDict[key];
         if ([key isKindOfClass:NSString.class]) {
-            // 判断value的类型是否合法
             BOOL isValidValue = NO;
             if ([value isKindOfClass:NSNumber.class] || [value isKindOfClass:NSString.class]) {
-                // 是数值和字符串类型，合法
                 isValidValue = YES;
             } else if ([value isKindOfClass:NSArray.class]) {
-                // 是数组类型，进一步判断是否元素都是字符串
                 isValidValue = YES;
                 for (NSObject *e in (NSArray *)value) {
                     if (![e isKindOfClass:NSString.class]) {
@@ -175,12 +185,11 @@ typedef enum : NSUInteger {
                 }
             }
             
-            // 如果合法，就添加
             if (isValidValue) {
                 [validatedProfileDict setObject:value forKey:key];
             }
-        } // End if key is NSString
-    }  // End for
+        }
+    }
     
     return validatedProfileDict;
 }
@@ -209,42 +218,38 @@ typedef enum : NSUInteger {
     }
     if (eventV3Name && params) {
         BOOL ret = [self profileEvent:eventV3Name params:params];
-//        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-//            [self.profileReporter sendProfileTrack];  // 立刻返回，不耗时
-//        });
         return ret;
     }
     return NO;
 }
 
 #pragma mark - impl
-// impl。返回值表示是否进行了上报。设置该层是为了单元测试。
 
 - (BOOL)impl_profileSet:(NSDictionary *)profileDict {
-    
-    NSString *ssid = [self ssID];
-    // 通用类型检查
+    NSString *ssid = bd_registerSSID(self.appID);
     NSMutableDictionary *validatedProfileDict = [self validateProfileDict:profileDict];
     
-    // 流量控制
     NSArray *snapshotKeys = validatedProfileDict.allKeys;
+    NSMutableArray *dupValueKeys = [NSMutableArray array];
+    
     for (NSString *name in snapshotKeys) {
         NSObject *value = validatedProfileDict[name];
         BDProfileEntry *profileEntry = [[self profileEntriesForSSID:ssid] objectForKey:name];
-        // 若不存在或存在但已经过期，则重新添加
-        if (!profileEntry || ![profileEntry remainsValid]) {
-            profileEntry = [[BDProfileEntry alloc] initWithProfileName:name value:value];
-            [[self profileEntriesForSSID:ssid] setObject:profileEntry forKey:name];
-        } else {
-            // 若已存在且在有效内，则考虑用户ssid、键名、值三元素。若三元素都相同，则不上报。
-            if ([profileEntry.name isEqualToString:name] &&
-                [profileEntry.valueHash isEqualToString:[BDProfileEntry calcValueHash:value]]) {
-                return NO;
-            }
+        if (profileEntry
+            && [profileEntry.name isEqualToString:name] &&
+            [profileEntry.valueHash isEqualToString:[BDProfileEntry calcValueHash:value]]) {
+            [dupValueKeys addObject:name];
+            continue;
         }
+        profileEntry = [[BDProfileEntry alloc] initWithProfileName:name value:value];
+        [[self profileEntriesForSSID:ssid] setObject:profileEntry forKey:name];
+    }
+
+    if (dupValueKeys.count == validatedProfileDict.allKeys.count) {
+        return NO;
     }
     
-    // 上报
+    [validatedProfileDict removeObjectsForKeys:dupValueKeys];
     if (validatedProfileDict.count > 0) {
         return [self reportProfileDict:validatedProfileDict reqType:BDProfileRequestTypeSet];
     }
@@ -252,23 +257,18 @@ typedef enum : NSUInteger {
 }
 
 - (BOOL)impl_profileSetOnce:(NSDictionary *)profileDict {
+    NSString *ssid = bd_registerSSID(self.appID);
     
-    NSString *ssid = self.ssID;
-    // 通用类型检查
     NSMutableDictionary *validatedProfileDict = [self validateProfileDict:profileDict];
     
-    // 流量控制。若已经setOnce过该key，则将其移除出profileDict，不再上报。
     for (NSString *key in validatedProfileDict.allKeys) {
         if ([[self profileNamesForSSID:ssid] containsObject:key]) {
-            // 已经存在这个profile名称了，因此移除出profileDict，后续不上报
             [validatedProfileDict removeObjectForKey:key];
         } else {
-            // 还不存在这个profile名称，加入集合，后续会上报。
             [[self profileNamesForSSID:ssid] addObject:key];
         }
     }
     
-    // 上报
     if (validatedProfileDict.count > 0) {
         return [self reportProfileDict:validatedProfileDict reqType:BDProfileRequestTypeSetOnce];
     }
@@ -276,7 +276,7 @@ typedef enum : NSUInteger {
 }
 
 - (BOOL)impl_profileUnset:(NSString *)profileName {
-    NSString *ssid = self.ssID;
+    NSString *ssid = bd_registerSSID(self.appID);
     BOOL ret = [self reportProfileDict:@{profileName: @(1)} reqType:BDProfileRequestTypeUnset];
     if (ret) {
         if ([[self profileNamesForSSID:ssid] containsObject:profileName]) {
@@ -290,19 +290,15 @@ typedef enum : NSUInteger {
 }
 
 - (BOOL)impl_profileIncrement:(NSDictionary <NSString *, NSNumber *> *)profileDict {
-    // 通用类型检查.
     NSMutableDictionary *validatedProfileDict = [self validateProfileDict:profileDict];
     
-    // 键为字符串，值为NSNumber类型。 移除不符合类型检查的KV对。
     for (NSString *key in validatedProfileDict.allKeys) {
         NSObject *value = validatedProfileDict[key];
-        // 如果不是NSNumber类型，或者是浮点数，就过滤
         if (![value isKindOfClass:NSNumber.class] || [[(NSNumber *)value stringValue] containsString:@"."]) {
             [validatedProfileDict removeObjectForKey:key];
         }
     }
     
-    // 上报
     if (validatedProfileDict.count > 0) {
         return [self reportProfileDict:validatedProfileDict reqType:BDProfileRequestTypeIncrement];
     }
@@ -310,23 +306,19 @@ typedef enum : NSUInteger {
 }
 
 - (BOOL)impl_profileAppend:(NSDictionary *)profileDict {
-    // 通用类型检查。
     NSMutableDictionary *validatedProfileDict = [self validateProfileDict:profileDict];
     
-    // Append接口类型检查。value的类型必须为NSString，否则移除。
     for (NSString *key in validatedProfileDict.allKeys) {
         NSObject *value = validatedProfileDict[key];
         
-        if (![value isKindOfClass:NSArray.class] && ![value isKindOfClass:NSString.class]) { // value 既不是NSArray，也不是NSString。这种情况移除该KV对。
+        if (![value isKindOfClass:NSArray.class] && ![value isKindOfClass:NSString.class]) {
             [validatedProfileDict removeObjectForKey:key];
         }
         else if ([value isKindOfClass:NSString.class]) {
-            // 如果value是NSString，则转为数组，使得上报时value类型统一为数组。
             [validatedProfileDict setObject:@[value] forKey:key];
         }
     }
     
-    // 上报
     if (validatedProfileDict.count > 0) {
         return [self reportProfileDict:validatedProfileDict reqType:BDProfileRequestTypeAppend];
     }
@@ -334,7 +326,6 @@ typedef enum : NSUInteger {
 }
 
 #ifdef DEBUG
-/// 清空Profile流控数据结构，仅用于单元测试
 - (void)_resetProfileFlowControlPolicy {
     [self setControledProfileEntries:nil];
     [self setControledProfileNames:nil];
@@ -342,7 +333,6 @@ typedef enum : NSUInteger {
 #endif
 
 #pragma mark 关联对象
-/// 用于profileSet接口流量控制的数据结构. ssid -> KV_DICT
 - (NSMutableDictionary <NSString *, NSMutableDictionary *> *)controledProfileEntries {
     if (!objc_getAssociatedObject(self, setFlowControlAK)) {
         [self setControledProfileEntries:[NSMutableDictionary new]];
@@ -354,7 +344,6 @@ typedef enum : NSUInteger {
     objc_setAssociatedObject(self, setFlowControlAK, profileEntries, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-/// 用于profileSetOnce接口上报控制的数据结构
 - (NSMutableDictionary <NSString *, NSMutableSet *> *)controledProfileNames {
     if (!objc_getAssociatedObject(self, setOnceFlowControlAK)) {
         [self setControledProfileNames:[NSMutableDictionary new]];
@@ -381,7 +370,6 @@ typedef enum : NSUInteger {
 
 
 #pragma mark -
-/// 获取对应用户ssid命名空间的数据结构
 - (NSMutableDictionary *)profileEntriesForSSID:(NSString *)ssid {
     if (!ssid) {
         return nil;
@@ -394,7 +382,6 @@ typedef enum : NSUInteger {
     return [controledProfileEntries objectForKey:ssid];
 }
 
-/// 获取对应用户ssid命名空间的数据结构
 - (NSMutableSet *)profileNamesForSSID:(NSString *)ssid {
     if (!ssid) {
         return nil;

@@ -50,14 +50,12 @@ static size_t veaes_keyLength(VEAESKeySize keySize) {
     }
 
     size_t keyLength = veaes_keyLength(size);
-    /// key
     uint8_t cKey[keyLength];
     bzero(cKey, keyLength);
     [keyData getBytes:cKey length:keyLength];
     
     
     CCOptions option = 0;
-    /// IV
     uint8_t cIv[kCCBlockSizeAES128];
     bzero(cIv, kCCBlockSizeAES128);
     if (ivData.length > 0) {
@@ -66,7 +64,6 @@ static size_t veaes_keyLength(VEAESKeySize keySize) {
     } else {
         option = kCCOptionPKCS7Padding | kCCOptionECBMode;
     }
-     /// buffer
     size_t bufferSize = [self length] + kCCBlockSizeAES128;
     void *buffer = malloc(sizeof(uint8_t) * bufferSize);
     
@@ -75,7 +72,6 @@ static size_t veaes_keyLength(VEAESKeySize keySize) {
     }
     
     size_t encryptedSize = 0;
-    /// Encrypt
     CCCryptorStatus cryptStatus = CCCrypt(kCCEncrypt, kCCAlgorithmAES, option,
                                           cKey, keyLength, cIv,
                                           [self bytes], [self length],

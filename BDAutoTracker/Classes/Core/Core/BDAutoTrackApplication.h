@@ -27,13 +27,13 @@ static NSString * const kBDAutoTrackBDCS = @"BDCS";
 
 // gps
 @property (nonatomic, strong) NSString *geoCoordinateSystem;
-@property (nonatomic, assign) long longitude;
-@property (nonatomic, assign) long latitude;
+@property (nonatomic, assign) double longitude;
+@property (nonatomic, assign) double latitude;
 
 // autotrack gps
 @property (nonatomic, strong) NSString *autoTrackGeoCoordinateSystem;
-@property (nonatomic, assign) long autoTrackLongitude;
-@property (nonatomic, assign) long autoTrackLatitude;
+@property (nonatomic, assign) double autoTrackLongitude;
+@property (nonatomic, assign) double autoTrackLatitude;
 
 + (instancetype)shared;
 
@@ -44,6 +44,7 @@ static NSString * const kBDAutoTrackBDCS = @"BDCS";
 // autotrack gps
 - (void)updateAutoTrackGPSLocation:(enum BDAutoTrackGeoCoordinateSystem)geoCoordinateSystem longitude:(double)longitude latitude:(double)latitude;
 - (BOOL)hasAutoTrackGPSLocation;
++ (void)updateAutoTrackGPSLocation:(enum BDAutoTrackGeoCoordinateSystem)geoCoordinateSystem longitude:(double)longitude latitude:(double)latitude;
 
 @end
 

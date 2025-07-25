@@ -10,7 +10,8 @@
 #import "BDAutoTrackDurationEvent.h"
 #import "BDAutoTrackUtility.h"
 #import "RangersLog.h"
-#import "BDUIAutoTracker.h"
+#import "BDAutoTrack+Private.h"
+#import "BDAutoTrackLocalConfigService.h"
 #import "BDTrackConstants.h"
 #import "BDAutoTrackPageLeave.h"
 #import "UIViewController+AutoTrack.h"
@@ -19,7 +20,7 @@
 @interface BDAutoTrackPageLeave()
 
 @property (nonatomic, strong) BDAutoTrackDurationEvent *currentEvent;
-@property (nonatomic, strong) NSMutableDictionary *eventDict;
+@property (nonatomic, strong) NSMapTable *eventDict;
 
 @end
 
@@ -47,8 +48,8 @@
 - (instancetype)init {
     self = [super init];
     
-    self.enabled = YES;
-    self.eventDict = [NSMutableDictionary dictionary];
+    self.enabled = NO;
+    self.eventDict = [NSMapTable weakToStrongObjectsMapTable];
     
     [self bindevents];
 
@@ -84,55 +85,73 @@
 
 #pragma mark - implementations
 
-- (void)updateEnabled:(BOOL)enabled {
-    self.enabled = enabled;
-}
-
 - (void)enterPage:(UIViewController *)vc {
-    if (!self.enabled) {
-        return;
-    }
-    
-    NSNumber * nowTimeMS = bd_milloSecondsInterval();
-    NSString * eventName = [self get_key_by_vc:vc];
-    self.currentEvent = [BDAutoTrackDurationEvent createByEventName:eventName];
-    [self.currentEvent start:nowTimeMS];
-    [self.eventDict setValue:self.currentEvent forKey:eventName];
+    @try {
+        if (![self checkEnabled]) {
+            return;
+        }
+        
+        NSString *version = [UIDevice currentDevice].systemVersion;
+        if (version.doubleValue > 10.0) {
+            NSNumber * nowTimeMS = bd_milloSecondsInterval();
+            NSString * eventName = [NSString stringWithFormat:@"bdautotrack_leave_page_event_%lu", vc.hash];
+            self.currentEvent = [BDAutoTrackDurationEvent createByEventName:eventName];
+            [self.currentEvent start:nowTimeMS];
+            [self.eventDict setObject:self.currentEvent forKey:vc];
+        }
+    } @catch (NSException *exception) {}
 }
 
-- (void)leavePage:(UIViewController *)vc {
-    if (!self.enabled) {
-        return;
-    }
+- (NSDictionary *)leavePage:(UIViewController *)vc {
+    @try {
+        if (!self.enabled) {
+            return nil;
+        }
+        
+        NSMutableDictionary *params = [NSMutableDictionary new];
+        NSString *version = [UIDevice currentDevice].systemVersion;
+        if (version.doubleValue > 10.0) {
+            BDAutoTrackDurationEvent *durationEvent = [self getEventByController:vc];
+            if (durationEvent == nil || durationEvent.state == BDAutoTrackDurationEventStop) {
+                return nil;
+            }
+
+            NSNumber * nowTimeMS = bd_milloSecondsInterval();
+            [durationEvent stop:nowTimeMS];
+            [params setValue:[NSNumber numberWithLong:durationEvent.duration] forKey:kBDAutoTrackEventPageDuration];
+            [self.eventDict removeObjectForKey:vc];
+            
+            return params;
+        }
+    } @catch (NSException *exception) {}
     
-    BDAutoTrackDurationEvent *durationEvent = [self get_event_by_controller:vc];
-    if (durationEvent == nil || durationEvent.state == BDAutoTrackDurationEventStop) {
-        RL_WARN(@"", @"%@ track leavePage failed: should call enterPage first", durationEvent.eventName);
-        return;
-    }
-
-    NSNumber * nowTimeMS = bd_milloSecondsInterval();
-    [durationEvent stop:nowTimeMS];
-    NSDictionary *params = @{
-        kBDAutoTrackEventPageDuration:[NSNumber numberWithLong:durationEvent.duration]
-    };
-    bd_ui_trackPageLeaveEvent(vc, params);
-
-    NSString *key = [self get_key_by_vc:vc];
-    [self.eventDict setValue:nil forKey:key];
+    return nil;
 }
 
 
 #pragma mark - private functions
 
-- (BDAutoTrackDurationEvent *)get_event_by_controller:(UIViewController *)vc {
-    NSString *key = [self get_key_by_vc:vc];
-    return self.eventDict[key];
+- (BDAutoTrackDurationEvent *)getEventByController:(UIViewController *)vc {
+    if (!vc) {
+        return nil;
+    }
+    return [self.eventDict objectForKey:vc];
 }
 
-- (NSString *)get_key_by_vc:(UIViewController *)vc {
-    return [NSString stringWithFormat:@"bdautotrack_leave_page_event_%lu", vc.hash];
+- (BOOL)checkEnabled {
+    NSArray<BDAutoTrack *> *allTracker = [BDAutoTrack allTrackers];
+    for (BDAutoTrack *track in allTracker) {
+        if (![track isKindOfClass:[BDAutoTrack class]]) {
+            continue;
+        }
+        BDAutoTrackLocalConfigService *settings = track.localConfig;
+        if (settings.trackPageLeaveEnabled) {
+            self.enabled = YES;
+            return YES;
+        }
+    }
+    self.enabled = NO;
+    return NO;
 }
-
 
 @end

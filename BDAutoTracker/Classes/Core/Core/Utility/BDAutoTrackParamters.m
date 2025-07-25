@@ -14,9 +14,10 @@
 #import "BDAutoTrackSessionHandler.h"
 #import "BDAutoTrackUtility.h"
 #import "RangersAppLogConfig.h"
+#import "BDAutoTrackRegisterService.h"
 #import "BDAutoTrackLocalConfigService.h"
 #import "BDAutoTrackRemoteSettingService.h"
-#import "BDAutoTrackABTest.h"
+#import "BDAutoTrackABConfig.h"
 #import "BDAutoTrackApplication.h"
 
 #if DEBUG && __has_include("RALInstallExtraParams.h")
@@ -24,11 +25,9 @@
 #endif
 
 #import "NSDictionary+VETyped.h"
-#import "NSData+VEGZip.h"
+#import "NSData+VECompression.h"
 #import "BDAutoTrackEnviroment.h"
 #import "BDAutoTrack+Private.h"
-
-static NSString *const kTimeSyncStorageKey = @"kTimeSyncStorageKey";
 
 BOOL _bd_URLHasQuery(NSString *url) {
     NSURL *urlObj = [NSURL URLWithString:url];
@@ -78,98 +77,20 @@ NSString *bd_appendQueryToURL(NSString *url, NSString *key, NSString *value) {
     return ans;
 }
 
-NSMutableDictionary *bd_getCompressedDecoratedBase64QueryDictWithAllowedKeys(NSMutableDictionary *parameters, NSArray *allowedKeys, id<BDAutoTrackEncryptionDelegate> encryptionDelegate) {
-    /* `allowedKeys` will show in plain-text keys and be contained in tt_info's value(which is the encoded version of possible multiple keys),
-     * but the redundancy it's OK to the server side
-     */
-    NSMutableDictionary *allowedParameters = [NSMutableDictionary new];
-    for (NSString *key in parameters) {
-        if([allowedKeys containsObject:key]) {
-            [allowedParameters setValue:parameters[key] forKey:key];
-        }
-    }
-    
-    NSString *query = bd_queryFromDictionary(parameters);
-    NSData *queryData = [query dataUsingEncoding:NSUTF8StringEncoding];
-    
-    /* GZIP */
-    NSError *error;
-    queryData = [queryData ve_dataByGZipCompressingWithError:&error];
-    
-    /* 加密 */
-    if ([encryptionDelegate respondsToSelector:@selector(encryptData:error:)]) {
-        if (!error) {
-            queryData = [encryptionDelegate encryptData:queryData error:&error];
-        }
-    }
-    
-    /* url-safe base64 */
-    NSString *base64QueryStr = [queryData base64EncodedStringWithOptions:0];
-    base64QueryStr = [base64QueryStr stringByReplacingOccurrencesOfString:@"/" withString:@"_"];
-    base64QueryStr = [base64QueryStr stringByReplacingOccurrencesOfString:@"+" withString:@"-"];
-    
-    [allowedParameters setValue:base64QueryStr forKey:kBDAutoTrackTTInfo];
-    return allowedParameters;
-}
-
-NSString *bd_getCompressedDecoratedBase64URLStringWithAllowedKeys(NSString *urlString, NSArray *allowedKeys, id<BDAutoTrackEncryptionDelegate> encryptionDelegate) {
-    
-    NSURLComponents *urlComp = [NSURLComponents componentsWithString:urlString];
-    
-    // 获取 url 中的 query 部分加密
-//    NSString *query = urlComp.query;
-    
-    NSString *query = [NSURL URLWithString:urlString].query;
-    NSData *queryData = [query dataUsingEncoding:NSUTF8StringEncoding];
-    
-    /* GZIP */
-    NSError *error;
-    queryData = [queryData ve_dataByGZipCompressingWithError:&error];
-    
-    /* 加密 */
-    if ([encryptionDelegate respondsToSelector:@selector(encryptData:error:)]) {
-        if (!error) {
-            queryData = [encryptionDelegate encryptData:queryData error:&error];
-        }
-    }
-    
-    /* url-safe base64 */
-    NSString *base64QueryStr = [queryData base64EncodedStringWithOptions:0];
-    base64QueryStr = [base64QueryStr stringByReplacingOccurrencesOfString:@"/" withString:@"_"];
-    base64QueryStr = [base64QueryStr stringByReplacingOccurrencesOfString:@"+" withString:@"-"];
-    
-    
-    /* 创建一个新的 URL 包含 tt_info 加密字段和 allowedKeys */
-    NSMutableArray<NSURLQueryItem *> *newQueryItems = [NSMutableArray array];
-    [newQueryItems addObject:[NSURLQueryItem queryItemWithName:kBDAutoTrackTTInfo value:base64QueryStr]];
-    /* `allowedKeys` will show in plain-text keys and be contained in tt_info's value(which is the encoded version of possible multiple keys),
-     * but the redundancy it's OK to the server side
-     */
-    for (NSURLQueryItem *item in urlComp.queryItems) {
-        if([allowedKeys containsObject:item.name]) {
-            [newQueryItems addObject:item];
-        }
-    }
-    urlComp.queryItems = newQueryItems;
-    
-    return urlComp.string;
-}
-
 #pragma mark Network Parameters
-/// 获取 HTTP请求报文的header
-/// @param needCompress 是否需要添加gzip
-/// @param appID appID
-/// @return HTTP请求报文的header
-/// @discussion 目前的caller都是传 needCompress = YES
-NSMutableDictionary * bd_headerField(BOOL needCompress, NSString *appID) {
+NSMutableDictionary * bd_headerField(NSString *appID) {
     NSMutableDictionary *headerFiled = [NSMutableDictionary new];
+    
+    BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:appID];
+    
+    [headerFiled addEntriesFromDictionary:tracker.config.HTTPHeaderFields?:@{}];
+    if (tracker.config.setHTTPHeaderFieldsBlock) {
+        [headerFiled addEntriesFromDictionary:tracker.config.setHTTPHeaderFieldsBlock()?:@{}];
+    }
 
     [headerFiled setValue:@"application/json; encoding=utf-8" forKey:@"Content-Type"];
     [headerFiled setValue:@"application/json" forKey:@"Accept"];
     [headerFiled setValue:@"keep-alive" forKey:@"Connection"];
-    if (needCompress) {
-        [headerFiled setValue:@"gzip" forKey:@"Content-Encoding"];
-    }
     NSString *aid = [appID mutableCopy];
     [headerFiled setValue:aid forKey:kBDAutoTrackAPPID];
 
@@ -191,41 +112,26 @@ static void addSharedNetworkParams(NSMutableDictionary *result, NSString *appID)
     [result setValue:bd_device_systemVersion() forKey:kBDAutoTrackOSVersion];
     [result setValue:bd_sandbox_releaseVersion() forKey:kBDAutoTrackAPPVersion];
     [result setValue:bd_device_decivceModel() forKey:kBDAutoTrackDecivceModel];
-//    [result setValue:bd_device_platformName() forKey:kBDAutoTrackDecivcePlatform];  introduced between 5.2.0 - 5.3.0. Comment to remove it from header. 
     [result setValue:@(bd_sandbox_isUpgradeUser()) forKey:kBDAutoTrackIsUpgradeUser];
-    [result setValue: [BDAutoTrack trackWithAppID:appID].identifier.identifierForTracking forKey:kBDAutoTrackIdentifierForTracking];
+    BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:appID];
+    NSString *unique = tracker.identifier.advertisingID;
 }
 
 void bd_addQueryNetworkParams(NSMutableDictionary *result, NSString *appID) {
     addSharedNetworkParams(result, appID);
 #if TARGET_OS_IOS
-    
-    [result setValue:[[BDAutoTrack trackWithAppID:appID].identifier identifierForVendor] forKey:@"idfv"];
+    BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:appID];
+    [result setValue:tracker.identifier.vendorID forKey:@"idfv"];
 #endif
     [result setValue:bd_sandbox_releaseVersion() forKey:kBDAutoTrackerVersionCode];
 }
 
 void bd_addBodyNetworkParams(NSMutableDictionary *result, NSString *appID) {
-/* shared params */
     addSharedNetworkParams(result, appID);
-    
-/* carrier related params */
-#if TARGET_OS_IOS
-    NSDictionary *carrierJSON = [BDAutoTrackEnviroment sharedEnviroment].carrier;
-    NSString *carrierMCC = [carrierJSON objectForKey:@"mobileCountryCode"];
-    NSString *carrierMNC = [carrierJSON objectForKey:@"mobileNetworkCode"];
-    if(!carrierMCC) carrierMCC = @"";
-    if(!carrierMNC) carrierMNC = @"";
-    [result setValue:[NSString stringWithFormat:@"%@%@",carrierMCC,carrierMNC] forKey:kBDAutoTrackMCCMNC];
-    
-    NSString *carrierName = [carrierJSON objectForKey:@"carrierName"];
-    if(!carrierName) carrierName = @"";
-    [result setValue:carrierName forKey:kBDAutoTrackCarrier];
-#endif
+    BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:appID];
     
     [result setValue:[BDAutoTrackEnviroment sharedEnviroment].connectionTypeName forKey:kBDAutoTrackAccess];
     
-/* device releated params */
     NSInteger timeZoneOffset = bd_device_timeZoneOffset();
     [result setValue:@(timeZoneOffset) forKey:kBDAutoTrackTimeZoneOffSet];
     
@@ -234,14 +140,12 @@ void bd_addBodyNetworkParams(NSMutableDictionary *result, NSString *appID) {
     
     [result setValue:bd_device_timeZoneName() forKey:kBDAutoTrackTimeZoneName];
 #if TARGET_OS_IOS
-    [result setValue:[[BDAutoTrack trackWithAppID:appID].identifier identifierForVendor]forKey:kBDAutoTrackVendorID];
+    [result setValue:tracker.identifier.vendorID forKey:kBDAutoTrackVendorID];
 #endif
     [result setValue:bd_device_currentRegion() forKey:kBDAutoTrackRegion];
     [result setValue:bd_device_currentSystemLanguage() forKey:kBDAutoTrackLanguage];
     [result setValue:bd_device_resolutionString() forKey:kBDAutoTrackResolution];
-    [result setValue:@(bd_device_isJailBroken()) forKey:kBDAutoTrackIsJailBroken];
     
-/* sandbox related params */
     [result setValue:bd_sandbox_bundleIdentifier() forKey:kBDAutoTrackPackage];
     [result setValue:bd_sandbox_appDisplayName() forKey:kBDAutoTrackAPPDisplayName];
     [result setValue:bd_sandbox_buildVersion() forKey:kBDAutoTrackAPPBuildVersion];
@@ -263,19 +167,15 @@ NSMutableDictionary *build_event_params_if_not_exist(NSMutableDictionary *result
 
 #pragma mark Event Parameters
 void bd_addSharedEventParams(NSMutableDictionary *result, NSString *appID) {
-    /* ABVersions */
     bd_addABVersions(result, appID);
     
-    /* UserUniqueID */
-    BDAutoTrack *track = [BDAutoTrack trackWithAppID:appID];
-    [result setValue:track.identifier.userUniqueID ?: [NSNull null] forKey:kBDAutoTrackEventUserID];
-    [result setValue:track.identifier.userUniqueIDType ?: [NSNull null] forKey:kBDAutoTrackEventUserIDType];
-    /* SSID */
-    [result setValue:[track ssID] forKey:kBDAutoTrackSSID];
-
+    BDAutoTrackLocalConfigService *settings = [BDAutoTrack trackWithAppID:appID].localConfig;
+    [result setValue:settings.syncUserUniqueID ?: [NSNull null] forKey:kBDAutoTrackEventUserID];
+    [result setValue:settings.syncUserUniqueIDType ?: [NSNull null] forKey:kBDAutoTrackEventUserIDType];
+    [result setValue:bd_registerSSID(appID) forKey:kBDAutoTrackSSID];
+    
 }
 
-/// Affected event types: UITrack, UserEvent (EventV3, Profile)
 void bd_addEventParameters(NSMutableDictionary * result) {
     [result setValue:[[BDAutoTrackSessionHandler sharedHandler] sessionID] forKey:kBDAutoTrackEventSessionID];
     [result setValue:bd_dateNowString() forKey:kBDAutoTrackEventTime];
@@ -284,7 +184,7 @@ void bd_addEventParameters(NSMutableDictionary * result) {
 }
 
 void bd_addScreenOrientation(NSMutableDictionary *result, NSString *appID) {
-    BDAutoTrackLocalConfigService *settings = bd_settingsServiceForAppID(appID);
+    BDAutoTrackLocalConfigService *settings = [BDAutoTrack trackWithAppID:appID].localConfig;
     if (settings.screenOrientationEnabled) {
         NSMutableDictionary *params = build_event_params_if_not_exist(result);
         NSString *screenOrientation = [BDAutoTrackApplication shared].screenOrientation;
@@ -293,29 +193,35 @@ void bd_addScreenOrientation(NSMutableDictionary *result, NSString *appID) {
 }
 
 void bd_addGPSLocation(NSMutableDictionary *result, NSString *appID) {
-    BDAutoTrackLocalConfigService *settings = bd_settingsServiceForAppID(appID);
-    BDAutoTrackApplication *bdapp = [BDAutoTrackApplication shared];
-    if (settings.trackGPSLocationEnabled && [bdapp hasAutoTrackGPSLocation]) {
-        NSMutableDictionary *params = build_event_params_if_not_exist(result);
-        [params setValue:bdapp.autoTrackGeoCoordinateSystem forKey:kBDAutoTrackGeoCoordinateSystem];
-        [params setValue:@(bdapp.autoTrackLongitude) forKey:kBDAutoTrackLongitude];
-        [params setValue:@(bdapp.autoTrackLatitude) forKey:kBDAutoTrackLatitude];
-        return;
-    }
-    
-    if ([bdapp hasGPSLocation]) {
-        NSMutableDictionary *params = build_event_params_if_not_exist(result);
-        [params setValue:bdapp.geoCoordinateSystem forKey:kBDAutoTrackGeoCoordinateSystem];
-        [params setValue:@(bdapp.longitude) forKey:kBDAutoTrackLongitude];
-        [params setValue:@(bdapp.latitude) forKey:kBDAutoTrackLatitude];
+    BDAutoTrackLocalConfigService *settings = [BDAutoTrack trackWithAppID:appID].localConfig;
+    if (settings.trackGPSLocationEnabled) {
+        BDAutoTrackApplication *bdapp = [BDAutoTrackApplication shared];
+        if ([bdapp hasAutoTrackGPSLocation]) {
+            NSMutableDictionary *params = build_event_params_if_not_exist(result);
+            [params setValue:bdapp.autoTrackGeoCoordinateSystem forKey:kBDAutoTrackGeoCoordinateSystem];
+            [params setValue:@(bdapp.autoTrackLongitude) forKey:kBDAutoTrackLongitude];
+            [params setValue:@(bdapp.autoTrackLatitude) forKey:kBDAutoTrackLatitude];
+            return;
+        }
+        
+        if ([bdapp hasGPSLocation]) {
+            NSMutableDictionary *params = build_event_params_if_not_exist(result);
+            [params setValue:bdapp.geoCoordinateSystem forKey:kBDAutoTrackGeoCoordinateSystem];
+            [params setValue:@(bdapp.longitude) forKey:kBDAutoTrackLongitude];
+            [params setValue:@(bdapp.latitude) forKey:kBDAutoTrackLatitude];
+        }
     }
 }
 
+void bd_addAppVersion(NSMutableDictionary *result) {
+    NSMutableDictionary *params = build_event_params_if_not_exist(result);
+    [params setValue:bd_sandbox_releaseVersion() forKey:kBDAutoTrackAPPVersion2];
+}
+
 void bd_addABVersions(NSMutableDictionary *result, NSString *appID) {
-    /* ABVersions */
-    if (bd_remoteSettingsForAppID(appID).abTestEnabled) {
-        [result setValue:[BDAutoTrack trackWithAppID:appID].abtestManager.sendableABVersions forKey:kBDAutoTrackABSDKVersion];
-    }
+    BDAutoTrackABConfig * config = [BDAutoTrack trackWithAppID:appID].abTester;
+    
+    [result setValue:[config allExposedABVersions] forKey:kBDAutoTrackABSDKVersion];
 }
 
 
@@ -338,24 +244,42 @@ BOOL bd_isResponseMessageSuccess(NSDictionary *responseDict) {
     return [message isEqualToString:BDAutoTrackMessageSuccess];
 }
 
-void bd_updateServerTime(NSDictionary *responseDict) {
-    long long interval = [responseDict vetyped_longlongValueForKey:kBDAutoTrackServerTime];
-    if (interval > 0) {
-        NSDictionary *timeSyncDicts = @{kBDAutoTrackServerTime: @(interval),
-                                        kBDAutoTrackLocalTime: @((long long)(bd_currentIntervalValue()))};
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [[NSUserDefaults standardUserDefaults] setObject:timeSyncDicts forKey:kTimeSyncStorageKey];
-        });
+NSDictionary* bd_filterSensitiveParameters(NSDictionary *body, NSString *appID) {
+    NSArray *fields = bd_remoteSettingsForAppID(appID).sensitiveFields;
+    if (fields && fields.count > 0) {
+        
+        NSMutableDictionary *modifiedHeader = [[body vetyped_dictionaryForKey:@"header"] mutableCopy];
+        __block BOOL modified = NO;
+        [modifiedHeader.allKeys enumerateObjectsUsingBlock:^(NSString*  _Nonnull key, NSUInteger idx, BOOL * _Nonnull stop) {
+            if ([fields containsObject:key]) {
+                [modifiedHeader removeObjectForKey:key];
+                modified = YES;
+            }
+        }];
+        if (modified) {
+            NSMutableDictionary *mutableBody = body.mutableCopy;
+            [mutableBody setValue:modifiedHeader forKey:@"header"];
+            return mutableBody;   
+        }
     }
+    return body;
 }
 
-NSDictionary * bd_timeSync(void) {
-    NSDictionary *timeSyncDicts = [[NSUserDefaults standardUserDefaults] dictionaryForKey:kTimeSyncStorageKey];
-    if (![timeSyncDicts isKindOfClass:[NSDictionary class]]) {
-        long long interval = (long long)bd_currentIntervalValue();
-        timeSyncDicts = @{kBDAutoTrackServerTime: @(interval),
-                          kBDAutoTrackLocalTime: @(interval)};
+void bd_handleCommonParamters(NSDictionary *body, BDAutoTrack *tracker, BDAutoTrackRequestURLType requestURLType) {
+    BDAutoTrackLocalConfigService *localConfig = tracker.localConfig;
+    if (!localConfig.commonParamtersBlock) {
+        return;
     }
-
-    return timeSyncDicts;
+    
+    NSMutableDictionary *header = [[body vetyped_dictionaryForKey:kBDAutoTrackHeader] mutableCopy];
+    if (!header) {
+        return;
+    }
+    
+    NSDictionary *commonParamters = localConfig.commonParamtersBlock(localConfig.serviceVendor, requestURLType, header);
+    if (!commonParamters) {
+        return;
+    }
+    
+    [body setValue:commonParamters forKey:kBDAutoTrackHeader];
 }

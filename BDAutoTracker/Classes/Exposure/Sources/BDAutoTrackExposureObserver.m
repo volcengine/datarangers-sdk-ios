@@ -35,6 +35,7 @@
     if(self = [super init]) {
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidBecomeActive) name:UIApplicationDidBecomeActiveNotification object:nil];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWillResignActive) name:UIApplicationWillResignActiveNotification object:nil];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidEnterBackground) name:UIApplicationDidEnterBackgroundNotification object:nil];
     }
     return self;
 }
@@ -42,6 +43,7 @@
 - (void)start
 {
     dispatch_block_t block = ^{
+        self->_applicationActive = (UIApplication.sharedApplication.applicationState == UIApplicationStateActive);
         
         static CFRunLoopObserverRef observer;
 
@@ -82,11 +84,17 @@
     _applicationActive = NO;
 }
 
+- (void)applicationDidEnterBackground
+{
+    [[[BDAutoTrackExposureManager sharedInstance] observedViews] enumerateObjectsUsingBlock:^(UIView*  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        [obj bdexposure_markInvisible];
+    }];
+}
+
 #pragma mark - start
 
 - (void)maybeDetectVisbile
 {
-    
     if (!_applicationActive) {
         return;
     }

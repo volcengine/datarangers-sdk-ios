@@ -16,4 +16,4 @@
 #import "UIViewController+TrackInfo.h"
 #import "BDKeyWindowTracker.h"
 
-#endif /* RangersAppLogUITrack_h */
+#endif

@@ -29,6 +29,11 @@ static NSString *kSubContextExposure = @"exposure_ctx";
 @property (nonatomic, assign) BOOL exposed;
 @property (nonatomic, strong) BDViewExposureData *event;
 
+@property (nonatomic, assign) NSTimeInterval exposeTime;
+@property (nonatomic, assign) NSInteger exposeCount;
+@property (nonatomic, assign) UIApplicationState leaveScreenAppState;
+@property (nonatomic, assign) BOOL leaveScreenPageVisible;
+
 - (void)detectIfExposed:(CGRect)rect;
 
 @end
@@ -37,21 +42,57 @@ static NSString *kSubContextExposure = @"exposure_ctx";
 
 - (void)detectIfExposed:(CGRect)rect
 {
-    BOOL exposed = NO;
     if (CGRectIsNull(rect) || CGRectIsEmpty(rect)) {
-        exposed = NO;
-    } else {
-        
-        CGFloat areaRadio = self.event.config.areaRatio;
-        if (areaRadio == 0.0) {
-            exposed = YES;
-        } else if (round(rect.size.width * rect.size.height) >=
-                   round(self.view.bounds.size.width * self.view.bounds.size.height) * areaRadio) {
-            exposed = YES;
-        }
+        self.exposed = NO;
+        return;
     }
-    self.exposed = exposed;
     
+    if (![self detectAreaRadio:rect]) {
+        self.exposed = NO;
+        return;
+    }
+    
+    if (![self detectStayTriggerTime]) {
+        self.exposed = NO;
+        return;
+    }
+    
+    self.exposed = YES;
+    
+}
+
+- (BOOL)detectAreaRadio:(CGRect)rect
+{
+    CGFloat areaRadio = self.event.config.areaRatio;
+    if (areaRadio <= 0.0) {
+        return YES;
+    }
+    
+    if (round(rect.size.width * rect.size.height) >=
+               round(self.view.bounds.size.width * self.view.bounds.size.height) * areaRadio) {
+        return YES;
+    }
+    
+    return NO;
+}
+
+- (BOOL)detectStayTriggerTime
+{
+    if (self.exposeTime <= 0) {
+        self.exposeTime = [[NSDate new] timeIntervalSince1970] * 1000;
+    }
+    
+    NSInteger stayTriggerTime = self.event.config.stayTriggerTime;
+    if (stayTriggerTime <= 0.0) {
+        return YES;
+    }
+    
+    NSTimeInterval nowTime = [[NSDate new] timeIntervalSince1970] * 1000;
+    if (nowTime - self.exposeTime >= stayTriggerTime) {
+        return YES;
+    }
+    
+    return NO;
 }
 
 - (void)setExposed:(BOOL)exposed
@@ -71,21 +112,64 @@ static NSString *kSubContextExposure = @"exposure_ctx";
 
 - (void)enterScreen
 {
-    RL_DEBUG(self.tracker.appID, @"[Exposure][%@] enter screen", self.view.bdtracker_pointerId);
+    RL_DEBUG(self.tracker, @"Exposure", @"[%@] enter screen", self.view.bdtracker_pointerId);
+    self.exposeCount += 1;
+    
     NSMutableDictionary *properties = [NSMutableDictionary dictionary];
     [properties addEntriesFromDictionary:bd_ui_trackPageInfo(self.view)];
     [properties addEntriesFromDictionary:[self.view bd_trackInfo]?:@{}];
+    
+    NSString *eventName = self.event.eventName;
+    if (eventName.length < 1) {
+        eventName = @"$bav2b_exposure";
+    }
+    
+    BDAutoTrackExposureTriggerType type = [self checkExposureType];
+    [properties setValue:@(type) forKey:@"$exposure_type"];
+    
     [properties addEntriesFromDictionary:self.event.properties?:@{}];
-    if ([self.event.eventName length] > 0) {
-        [self.tracker eventV3:self.event.eventName params:properties];
-    } else {
-        [self.tracker eventV3:@"bav2b_exposure" params:properties];
+    
+    BOOL allow = YES;
+    BDAutoTrackExposureBlock exposureBlock = self.event.config.exposureBlock;
+    if (exposureBlock) {
+        allow = exposureBlock(self, type, eventName, properties);
+    }
+    
+    if (allow) {
+        [self.tracker eventV3:eventName params:properties];
     }
 }
 
 - (void)leaveScreen
 {
     RL_DEBUG(self.tracker.appID, @"[Exposure][%@] leave screen", self.view.bdtracker_pointerId);
+    
+    self.exposeTime = 0;
+    self.leaveScreenAppState = UIApplication.sharedApplication.applicationState;
+    
+    UIViewController *controller = [self.view bd_controller];
+    if (controller.isViewLoaded && controller.view.window) {
+        self.leaveScreenPageVisible = YES;
+    } else {
+        self.leaveScreenPageVisible = NO;
+    }
+}
+
+- (BDAutoTrackExposureTriggerType)checkExposureType
+{
+    if (self.exposeCount <= 1) {
+        return BDAutoTrackExposureTriggerTypeExposureOnce;
+    }
+    
+    if (self.leaveScreenAppState == UIApplicationStateBackground) {
+        return BDAutoTrackExposureTriggerTypeResumeFromBack;
+    }
+    
+    if (!self.leaveScreenPageVisible) {
+        return BDAutoTrackExposureTriggerTypeResumeFromPage;
+    }
+    
+    return BDAutoTrackExposureTriggerTypeLifecycleShowNew;
 }
 
 @end
@@ -169,6 +253,8 @@ static NSString *kSubContextExposure = @"exposure_ctx";
     item.view = self.hostView;
     item.event = event;
     item.exposed = NO;
+    item.exposeCount = 0;
+    item.leaveScreenPageVisible = YES;
     [self.items addObject:item];
     
     RL_DEBUG(tracker.appID, @"[Exposure][%@] observe. ( %@ )", [item.view bdtracker_pointerId], item.event );

@@ -12,6 +12,7 @@
 #import "BDAutoTrackUtility.h"
 #import "RangersLog.h"
 #import "NSDictionary+VETyped.h"
+#import "BDTrackerErrorBuilder.h"
 
 
 static const NSUInteger AppLogEventSizeLimit     = 50 * 1024; // 50 Kb
@@ -41,7 +42,7 @@ static const NSUInteger AppLogEventSizeLimit     = 50 * 1024; // 50 Kb
 
 - (void)deleteAll
 {
-
+    
     NSString *deleteSQL = [NSString stringWithFormat:@"DELETE FROM %@;", self.tableName];
     [self.databaseQueue inDatabase:^(BDAutoTrackDatabase *db) {
         [db executeUpdate:deleteSQL];
@@ -49,28 +50,60 @@ static const NSUInteger AppLogEventSizeLimit     = 50 * 1024; // 50 Kb
     }];
 }
 
-/// 执行建表SQL
 - (void)checkDBFile {
     NSString *createSQL = [self createTableSql];
     [self.databaseQueue inDatabase:^(BDAutoTrackDatabase *db) {
         [db executeUpdate:createSQL];
         db.shouldCacheStatements = YES;
     }];
+    
+    NSTimeInterval currentTimeInterval = [[NSDate date] timeIntervalSince1970];
+    //alter table columns
+    NSArray *columns = [self columnsForTable];
+    
+    if (![columns containsObject:@"time"]) {
+        NSString *alterStatement = [NSString stringWithFormat:@"ALTER TABLE %@ ADD COLUMN time INTEGER NOT NULL DEFAULT 0", self.tableName];
+        [self.databaseQueue inDatabase:^(BDAutoTrackDatabase *db) {
+            if ([db executeUpdate:alterStatement]) {
+                [db executeUpdate:[NSString stringWithFormat:@"update %@ set time = %lld WHERE time = 0;",self.tableName, (long long)(currentTimeInterval*1000)]];
+            }
+        }];
+    }
+    
+    if (![columns containsObject:@"priority"]) {
+        NSString *alterStatement = [NSString stringWithFormat:@"ALTER TABLE %@ ADD COLUMN priority REAL NOT NULL DEFAULT 0", self.tableName];
+        [self.databaseQueue inDatabase:^(BDAutoTrackDatabase *db) {
+            [db executeUpdate:alterStatement];
+        }];
+    }
 }
 
-/// insert a track into the table (埋点入库)
-/// Execute INSERT SQL
-/// caller: - [DatabaseService insertTable: track: trackID:]
-/// @param track Dic 埋点数据
-/// @param trackID track_id. 若未指定则生成一个随机的UUID.
-/// @return YES if SQL is performed successfully, else NO.
-- (bool)insertTrack:(NSDictionary *)track trackID:(NSString *)trackID {
-    // 如果没有传入trackID，则trackID默认为一个新UUID
+- (NSArray *)columnsForTable {
+    NSMutableArray *columns = [[NSMutableArray alloc] init];
+    [self.databaseQueue inDatabase:^(BDAutoTrackDatabase *db) {
+        BDAutoTrackResultSet *resultSet = [db executeQuery:[NSString stringWithFormat:@"PRAGMA table_info(%@)", self.tableName]];
+        while ([resultSet next]) {
+            [columns addObject:[resultSet stringForColumn:@"name"]];
+        }
+        [resultSet close];
+    }];
+    return columns;
+}
+
+- (bool)insertTrack:(NSDictionary *)track trackID:(NSString *)trackID  withError:(NSError **)outErr {
+    return [self insertTrack:track trackID:trackID options:nil withError:outErr];
+}
+
+- (bool)insertTrack:(NSDictionary *)track
+            trackID:(NSString *)trackID
+            options:(nullable NSDictionary *)options
+          withError:(NSError **)outErr {
     if (![trackID isKindOfClass:[NSString class]] || trackID.length < 1) {
         trackID = [[NSUUID UUID] UUIDString];
     }
+    
+    NSInteger localTimeMS = [[track objectForKey:@"local_time_ms"] integerValue];
 
-    // JSON 序列化
     NSData *jsonData;
     __block NSError *err;
 #ifdef DEBUG
@@ -89,10 +122,12 @@ static const NSUInteger AppLogEventSizeLimit     = 50 * 1024; // 50 Kb
                                                  error:&err];
 #endif
     if (err) {
+        if (outErr) {
+            *outErr  =err;
+        }
         return NO;
     }
     
-    // 大日志处理：日志超过 50K 则丢弃，然后上报一个内部事件
     if (jsonData.length > AppLogEventSizeLimit) {
         NSMutableDictionary *errorTrack = [track mutableCopy];
         NSString *event = [errorTrack vetyped_stringForKey:kBDAutoTrackEventType] ?: @"";
@@ -105,28 +140,31 @@ static const NSUInteger AppLogEventSizeLimit     = 50 * 1024; // 50 Kb
                                                      error:nil];
     }
 
-    // 将JSON Data转为JSON String
     NSString *entireLogString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
     if (entireLogString.length <= 0) {
+        if (outErr) {
+            *outErr = [[[BDTrackerErrorBuilder builder] withCode:1001] build];
+        }
         return NO;
     }
     
-    // 执行SQL语句
     NSString *sql = [self insertSql];
+    NSInteger priority = [[options objectForKey:@"priority"] integerValue];
+    __block BOOL success = NO;
+    __block NSError *sqliteError;
     [self.databaseQueue inDatabase:^(BDAutoTrackDatabase *db) {
-        [db executeUpdate:sql values:@[trackID, entireLogString] error:&err];
+        success = [db executeUpdate:sql values:@[trackID, entireLogString,@(localTimeMS),@(priority)] error:&sqliteError];
+        
     }];
-    if (err) {
-        return NO;
+    if (sqliteError) {
+        if (outErr) {
+            *outErr = sqliteError;
+        }
     }
-    
-    return YES;
+    return success;
+
 }
 
-/// remove many tracks from the table, specified by `trackIDs`.
-/// Execute DELETE SQL.
-/// caller: - [BDAutoTrackBatchService removeTracks]
-/// @param trackIDs List<Str> 要删除的 track_id
 - (void)removeTracksByID:(NSArray<NSString *> *)trackIDs {
     if (![trackIDs isKindOfClass:[NSArray class]] || trackIDs.count < 1) {
         return;
@@ -147,14 +185,42 @@ static const NSUInteger AppLogEventSizeLimit     = 50 * 1024; // 50 Kb
     }];
 }
 
-/// SELECT Query. 获取最多200条埋点数据。
-/// caller: - [BDAutoTrackDatabaseService allTracks]
-/// caller: bd_db_allTableNames()
-/// @return List<Dic> 埋点数据组成的数组
-- (NSArray<NSDictionary *> *)allTracks {
-    NSMutableArray *result = [NSMutableArray array];
-    NSString *query = [NSString stringWithFormat:@"SELECT * FROM %@ limit 201;", self.tableName];
+- (void)downgradeTracksByID:(NSArray<NSString *> *)trackIDs {
+    if (![trackIDs isKindOfClass:[NSArray class]] || trackIDs.count < 1) {
+        return;
+    }
+    
+    NSString *tableName = [self tableName];
+    NSMutableArray<NSString *> *binds = [NSMutableArray new];
+    NSUInteger count = trackIDs.count;
+    for (NSUInteger index = 0; index < count; index++ ) {
+        [binds addObject:@"?"];
+    }
+    NSString *sql = [NSString stringWithFormat:@"UPDATE %@ set priority = 0 WHERE track_id IN (%@);", tableName, [binds componentsJoinedByString:@","]];
+    [self.databaseQueue inDatabase:^(BDAutoTrackDatabase *db) {
+        [db executeUpdate:sql values:trackIDs error:nil];
+    }];
+}
 
+- (NSArray<NSDictionary *> *)allTracks:(nullable NSDictionary *)options {
+    NSMutableArray *result = [NSMutableArray array];
+    NSInteger queryCount = 200;
+    if ([self.tableName isEqualToString:@"event_v3"] && options != nil) {
+        NSNumber *queryCountNumber = options[@"queryCount"];
+        if (queryCountNumber != nil) {
+            queryCount = queryCountNumber.integerValue;
+        }
+    }
+    
+    NSString *query = [NSString stringWithFormat:@"SELECT * FROM %@ limit %ld;", self.tableName, (long)queryCount];
+    
+    BOOL specifyPriority = [options.allKeys containsObject:@"priority"];
+    if (specifyPriority) {
+        // 99 only
+        NSInteger priority = [[options objectForKey:@"priority"] integerValue];
+        query = [NSString stringWithFormat:@"SELECT * FROM %@ WHERE priority = %ld limit 200;", self.tableName, (long)priority];
+    }
+    
     [self.databaseQueue inDatabase:^(BDAutoTrackDatabase *db) {
         BDAutoTrackResultSet *dbResult = [db executeQuery:query];
 
@@ -181,18 +247,33 @@ static const NSUInteger AppLogEventSizeLimit     = 50 * 1024; // 50 Kb
     return result;
 }
 
-/// 创建表SQL语句。字段：
-///  track_id 整型 主键列
-///  entire_log 字符串
 - (NSString *)createTableSql {
         return [NSString stringWithFormat:@"CREATE TABLE IF NOT EXISTS %@ \
-                (track_id VARCHAR(100), \
-                entire_log NVARCHAR(2000), \
+                (\
+                track_id    VARCHAR(100),                   \
+                entire_log  NVARCHAR(2000),                 \
+                time        INTEGER NOT NULL DEFAULT 0,     \
+                priority    REAL NOT NULL DEFAULT 0,        \
                 PRIMARY KEY(track_id))", self.tableName];
 }
 
 - (NSString *)insertSql {
-    return [NSString stringWithFormat:@"INSERT OR REPLACE INTO %@ (track_id, entire_log) VALUES(?, ?)", self.tableName];
+    return [NSString stringWithFormat:@"INSERT OR REPLACE INTO %@ (track_id, entire_log, time, priority) VALUES(?, ?, ?, ?)", self.tableName];
+}
+
+
+- (NSUInteger)count
+{
+    NSString *statement = [NSString stringWithFormat:@"SELECT count(1) FROM %@;", self.tableName];
+    __block NSUInteger count = 0;
+    [self.databaseQueue inDatabase:^(BDAutoTrackDatabase *db) {
+        BDAutoTrackResultSet *dbResult = [db executeQuery:statement];
+        if ([dbResult next]) {
+            count = [dbResult longForColumnIndex:0];
+        }
+        [dbResult close];
+    }];
+    return count;
 }
 
 @end

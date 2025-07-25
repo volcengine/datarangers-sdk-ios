@@ -11,7 +11,6 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// extern for Unit Test
 FOUNDATION_EXTERN NSMutableDictionary * bd_requestURLParameters(NSString *appID);
 FOUNDATION_EXTERN NSString * bd_validateRequestURL(NSString *requestURL);
 FOUNDATION_EXTERN NSMutableDictionary * bd_requestPostHeaderParameters(NSString *appID);

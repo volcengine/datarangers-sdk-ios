@@ -12,7 +12,7 @@
 #import "BDKeyWindowTracker.h"
 #import "BDUIAutoTracker.h"
 #import "BDAutoTrackSwizzle.h"
-#import "BDAutoTrackPageLeave.h"
+#import "BDAutoTrackUtility.h"
 
 
 @implementation UIViewController (AutoTrack)
@@ -20,7 +20,6 @@
 + (void)load {
     static dispatch_once_t onceToken;
     static IMP original_DidAppear_Imp = nil;
-    static IMP original_DidDisappear_Imp = nil;
     static IMP original_Present_Imp = nil;
     static IMP original_Dismiss_Imp = nil;
     dispatch_once(&onceToken, ^{
@@ -29,19 +28,8 @@
             if (original_DidAppear_Imp) {
                 if ([_self isKindOfClass:[UIAlertController class]]) {
                     bd_ui_trackAlertControllerAppear((UIAlertController *)_self);
-                } else {
-                    [[BDAutoTrackPageLeave shared] enterPage:_self];
                 }
                 ((void ( *)(id, SEL, BOOL))original_DidAppear_Imp)(_self, @selector(viewDidAppear:), animated);
-            }
-        });
-        
-        original_DidDisappear_Imp = bd_swizzle_instance_methodWithBlock([self class], @selector(viewDidDisappear:), ^(UIViewController *_self, BOOL animated){
-            if (original_DidDisappear_Imp) {
-                if (![_self isKindOfClass:[UIAlertController class]]) {
-                    [[BDAutoTrackPageLeave shared] leavePage:_self];
-                }
-                ((void ( *)(id, SEL, BOOL))original_DidDisappear_Imp)(_self, @selector(viewDidDisappear:), animated);
             }
         });
 
@@ -49,7 +37,7 @@
             if (original_Present_Imp) {
                 if (![viewControllerToPresent isKindOfClass:[UIAlertController class]]) {
                     UIViewController *presenting = [_self bd_topViewController:YES];
-                    bd_ui_trackPage(presenting, viewControllerToPresent, NO);
+                    bd_ui_trackPresentPage(presenting, viewControllerToPresent, NO);
                 }
 
                 ((void ( *)(id, SEL, UIViewController *, BOOL, dispatch_block_t))original_Present_Imp)(_self, @selector(presentViewController:animated:completion:), viewControllerToPresent, animated, completion);
@@ -71,7 +59,7 @@
                     }
                     
                     if (current != presented) {
-                        bd_ui_trackPage(presented, current, YES);
+                        bd_ui_trackPresentPage(presented, current, YES);
                     }
                 }
             }
@@ -100,9 +88,7 @@
         return [[(UITabBarController *)self selectedViewController] bd_topViewController:showPresented];
     }
 
-    /// UIPageViewController 且不展示多页
     if ([self isKindOfClass:[UIPageViewController class]] && !bd_ui_isMultiPage(self)) {
-        ///  lastObject
         return [[[(UIPageViewController *)self viewControllers] lastObject] bd_topViewController:showPresented];
     }
 
@@ -141,23 +127,22 @@
     NSString *pagePath = [self bdAutoTrackPagePath];
     NSString *page = NSStringFromClass([self class]);
 
-    NSDictionary *extra = [self bdAutoTrackExtraInfos];
+    NSDictionary *extra = bd_deep_copy([self bdAutoTrackExtraInfos]);
     if (pageID.length) {
         [info setValue:pageID forKey:kBDAutoTrackEventPageID];
     }
     if (pagePath.length) {
         [info setValue:pagePath forKey:kBDAutoTrackEventPagePath];
     }
-    if ([extra isKindOfClass:[NSDictionary class]] && extra.count > 0) {
+    if (extra && [extra isKindOfClass:[NSDictionary class]] && extra.count > 0) {
         [info setValue:extra forKey:[@"page_%@" stringByAppendingString:kBDAutoTrackEventDataCustom]];
     }
 
     [info setValue:page forKey:kBDAutoTrackEventPage];
     [info setValue:pageTitle forKey:kBDAutoTrackEventPageTitle];
     
-    // 自定义属性
-    NSDictionary *properties = [self bdAutoTrackPageProperties];
-    if ([properties isKindOfClass:[NSDictionary class]] && properties.count > 0) {
+    NSDictionary *properties = bd_deep_copy([self bdAutoTrackPageProperties]);
+    if (properties && [properties isKindOfClass:[NSDictionary class]] && properties.count > 0) {
         [info addEntriesFromDictionary:properties];
     }
 
@@ -171,11 +156,11 @@
     NSString *pagePath = [self bdAutoTrackPagePath];
     NSString *page = NSStringFromClass([self class]);
 
-    NSDictionary<NSString*, NSString *> *extra = [self bdAutoTrackExtraInfos];
+    NSDictionary<NSString*, NSString *> *extra = bd_deep_copy([self bdAutoTrackExtraInfos]);
     if (pageID.length) {
         [info setValue:pageID forKey:kBDAutoTrackEventReferPageID];
     }
-    if ([extra isKindOfClass:[NSDictionary class]] && extra.count>0) {
+    if (extra && [extra isKindOfClass:[NSDictionary class]] && extra.count>0) {
         [info setValue:extra forKey:[ @"refer_page_%@" stringByAppendingString:kBDAutoTrackEventDataCustom]];
     }
 

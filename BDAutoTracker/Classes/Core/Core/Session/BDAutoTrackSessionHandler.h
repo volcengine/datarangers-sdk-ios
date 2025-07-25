@@ -11,7 +11,6 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// 管理Session
 @interface BDAutoTrackSessionHandler : NSObject
 
 @property (atomic, copy, readonly) NSString *sessionID;
@@ -19,17 +18,19 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, readonly) NSArray *previousLaunchs;
 @property (nonatomic, copy, readonly) NSArray *previousTerminates;
 
+@property (nonatomic) BOOL shouldMarkLaunchedPassively;
+
 + (instancetype)sharedHandler;
 
-/// 返回调用之前是否 sessionStart
 - (BOOL)checkAndStartSession;
 
-/// for unit test
 - (void)startSessionWithIDChange:(BOOL)change;
 
 
 - (void)onUUIDChanged;
 - (void)createUUIDChangeSession;
+
+- (NSInteger)computeTotalDuration;
 
 @end
 

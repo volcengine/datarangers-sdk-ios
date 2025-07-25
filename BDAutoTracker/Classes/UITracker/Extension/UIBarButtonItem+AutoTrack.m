@@ -9,6 +9,7 @@
 #import "UIBarButtonItem+AutoTrack.h"
 #import "UIBarButtonItem+TrackInfo.h"
 #import "BDTrackConstants.h"
+#import "BDAutoTrackUtility.h"
 
 extern NSString *kBDViewPathSeperator;
 
@@ -27,13 +28,12 @@ extern NSString *kBDViewPathSeperator;
         [result setValue:@[title] forKey:kBDAutoTrackEventViewTitle];
     }
     [result setValue:elementType forKey:kBDAutoTrackEventElementType];
-    NSDictionary *extra = [self bdAutoTrackExtraInfos];
-    if ([extra isKindOfClass:[NSDictionary class]] && extra.count > 0) {
+    NSDictionary *extra = bd_deep_copy([self bdAutoTrackExtraInfos]);
+    if (extra && [extra isKindOfClass:[NSDictionary class]] && extra.count > 0) {
         [result setValue:extra forKey:kBDAutoTrackEventDataCustom];
     }
-    // 自定义属性
-    NSDictionary *properties = [self bdAutoTrackViewProperties];
-    if ([properties isKindOfClass:[NSDictionary class]] && properties.count > 0) {
+    NSDictionary *properties = bd_deep_copy([self bdAutoTrackViewProperties]);
+    if (properties && [properties isKindOfClass:[NSDictionary class]] && properties.count > 0) {
         [result addEntriesFromDictionary:properties];
     }
 }

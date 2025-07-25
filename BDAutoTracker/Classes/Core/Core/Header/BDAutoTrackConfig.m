@@ -10,9 +10,20 @@
 #import "BDAutoTrackSandBoxHelper.h"
 #import "BDAutoTrackConfig+AppLog.h"
 #import "RangersAppLogConfig.h"
+#import "BDAutoTrackUtility.h"
 
 @interface BDAutoTrackConfig ()
+
 @property (nonatomic, copy) NSDictionary<id, id> *launchOptions;
+
+@property (nonatomic, copy, nullable) NSString *initialUserUniqueID;
+
+@property (nonatomic, copy, nullable) NSString *initialUserUniqueIDType;
+
+@property (nonatomic, assign) BOOL rollback;
+
+@property (nonatomic, strong) NSString *parseAppID;
+
 @end
 
 @implementation BDAutoTrackConfig
@@ -24,10 +35,12 @@
         self.appName = bd_sandbox_appName();
         self.serviceVendor = [RangersAppLogConfig sharedInstance].defaultVendor ?: @"";
         self.logNeedEncrypt = YES;
-        self.autoActiveUser = YES;
         self.showDebugLog = NO;
+        self.H5BridgeAllowedDomainPatterns = @[];
+        self.useBridgeUpdateUUIDEnabled = YES;
         
         self.autoTrackEnabled = YES;
+        self.autoTrackEventType = BDAutoTrackDataTypePage | BDAutoTrackDataTypeClick;
         self.H5AutoTrackEnabled = YES;
         
         self.abEnable = YES;
@@ -36,13 +49,42 @@
         self.enableDeferredALink = NO;
         self.clearABCacheOnUserChange = YES;
         
-        // 事件采集总开关，关闭后所有事件都不会上报，这里默认开启
         self.trackEventEnabled = YES;
         
-        self.monitorEnabled = YES;
+        self.trackCrashEnabled = NO;
+        self.devToolsEnabled = NO;
+        self.launchTerminateEnable = YES;
+        
+        self.encryptionType = BDAutoTrackEncryptionTypeDefault;
+        
+        self.isAbTestExposureEventRepeatEnabled = YES;
     }
     
     return self;
+}
+
+- (NSString *)appID {
+    NSString *aid = _appID;
+    if ([aid hasPrefix:@"rangers://"]) {
+        if (self.parseAppID.length > 0) {
+            return self.parseAppID;
+        }
+        @try {
+            NSURL *aidUrl = [NSURL URLWithString:aid];
+            NSString *aidBase64 = [[aidUrl.path stringByReplacingOccurrencesOfString:@"/" withString:@""] stringByRemovingPercentEncoding];
+            NSString *aidMd5 = aidUrl.host;
+            if (aidBase64.length > 0 && aidMd5.length > 0) {
+                NSString *parserAid = ral_base64_string(aidBase64);
+                if ([bd_calc_md5([parserAid UTF8String]) caseInsensitiveCompare:aidMd5] == NSOrderedSame) {
+                    self.parseAppID = parserAid;
+                    return parserAid;
+                }
+            }
+        } @catch (NSException *exception) {
+            return aid;
+        }
+    }
+    return aid;
 }
 
 + (instancetype)configWithAppID:(NSString *)appID launchOptions:(NSDictionary<id, id> *)launchOptions {
@@ -62,7 +104,6 @@
 + (instancetype)configWithSecondAppID:(NSString *)appID {
     BDAutoTrackConfig *config = [[self alloc] init];
     config.appID = appID;
-    config.autoActiveUser = NO;
     config.autoFetchSettings = NO;
     
     return config;

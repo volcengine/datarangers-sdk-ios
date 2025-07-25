@@ -6,6 +6,8 @@
 //
 
 #import "SceneDelegate.h"
+#import <RangersAppLog/BDAutoTrackSchemeHandler.h>
+
 
 @interface SceneDelegate ()
 
@@ -53,5 +55,15 @@
     // to restore the scene back to its current state.
 }
 
+- (void)scene:(UIScene *)scene openURLContexts:(NSSet<UIOpenURLContext *> *)URLContexts {
+    for (UIOpenURLContext *context in URLContexts) {
+        NSURL *URL = context.URL;
+        // 参数APPID: 参考2.1节获取
+        if ([[BDAutoTrackSchemeHandler sharedHandler] handleURL:URL appID:@"your_appid" scene:scene]) {
+            continue;
+        }
+        /// ……
+    }
+}
 
 @end

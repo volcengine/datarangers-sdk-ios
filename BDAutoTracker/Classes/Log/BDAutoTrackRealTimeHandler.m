@@ -12,8 +12,8 @@
 
 #import "BDAutoTrackLoginRequest.h"
 #import "BDAutoTrackSchemeHandler+Internal.h"
-#import "BDToast.h"
 #import "RangersLog.h"
+#import "BDAutoTrackUI.h"
 
 __attribute__((constructor)) void bdauto_log_handler(void) {
     [[BDAutoTrackSchemeHandler sharedHandler] registerInternalHandler:[BDAutoTrackRealTimeHandler new]];
@@ -39,16 +39,18 @@ __attribute__((constructor)) void bdauto_log_handler(void) {
 - (BOOL)handleWithAppID:(NSString *)appID
                 qrParam:(NSString *)qr
                   scene:(id)scene {
-    RL_DEBUG(appID, @"[URL_HANDLER] handleWithAppID:qrParam:scene start ...");
+    BDAutoTrack *tracker = [BDAutoTrack trackWithAppID:appID];
+    RL_DEBUG(tracker, @"OPEN_URL",@"handleWithAppID:qrParam:scene start ...");
     BDAutoTrackLoginRequest *request = [[BDAutoTrackLoginRequest alloc] initWithAppID:appID];
     request.successCallback = ^{
-        RL_DEBUG(appID, @"[URL_HANDLER] handleWithAppID:qrParam:scene successful ...");
-        bd_picker_toastShow(@"Start verification!");
+        RL_DEBUG(tracker, @"OPEN_URL",@"verification login successful ...");
+        [BDAutoTrackUI toast:@"Real-time Verification is avaible"];
         BDAutoTrackRealTimeService *service = [[BDAutoTrackRealTimeService alloc] initWithAppID:appID];
         [service registerService];
     };
     request.failureCallback = ^{
-        RL_ERROR(appID, @"[URL_HANDLER] handleWithAppID:qrParam:scene failure ...");
+        RL_ERROR(tracker, @"OPEN_URL",@"verification login failure ...");
+        [BDAutoTrackUI toast:@"Real-time Verification login failure"];
     };
     request.qr = qr;
     [request startRequestWithRetry:0];
