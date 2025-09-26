@@ -181,6 +181,14 @@ static const NSUInteger        kEventMaxCountPerRequest    = 200;
                           options:(nullable NSDictionary *)options
                           handler:(void(^)(void))handler {
     
+    if (!self.associatedTrack.eventReportingEnabled && from != BDAutoTrackTriggerSourceManually) {
+        RL_DEBUG(self.associatedTrack, @"Uploader", @"terminate due to EVENT REPORTING DISABLED.");
+        if (handler) {
+            handler();
+        }
+        return;
+    }
+    
     if (from != BDAutoTrackTriggerSourceRealtime) {
         [self.associatedTrack.eventGenerator restoreBulkCounter];
     }

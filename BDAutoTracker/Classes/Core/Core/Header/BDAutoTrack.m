@@ -199,6 +199,7 @@ static id<BDAutoTrackEncryptionDelegate> gEncryptor;
         self.ignoredPageClasses = [NSMutableSet new];
         self.ignoredClickViewClasses = [NSMutableSet new];
         self.started = NO;
+        self.eventReportingEnabled = NO;
         
         NSString *appID = config.appID;
         NSString *queueName = [NSString stringWithFormat:@"com.applog.track_%@", appID];
@@ -878,6 +879,25 @@ static id<BDAutoTrackEncryptionDelegate> gEncryptor;
 - (BOOL)registerAvalible
 {
     return bd_registerServiceAvailableForAppID(self.appID);
+}
+
+#pragma mark - Event Reporting Control
+- (void)flushEvents {
+    if (self.serialQueue) {
+        dispatch_async(self.serialQueue, ^{
+            BDAutoTrackBatchService *batchService = (BDAutoTrackBatchService *)bd_standardServices(BDAutoTrackServiceNameBatch, self.appID);
+            if (batchService) {
+                [batchService sendTrackDataFrom:BDAutoTrackTriggerSourceManually];
+                RL_DEBUG(self, @"EventReporting", @"Manual flush events triggered");
+            }
+        });
+    } else {
+        BDAutoTrackBatchService *batchService = (BDAutoTrackBatchService *)bd_standardServices(BDAutoTrackServiceNameBatch, self.appID);
+        if (batchService) {
+            [batchService sendTrackDataFrom:BDAutoTrackTriggerSourceManually];
+            RL_DEBUG(self, @"EventReporting", @"Manual flush events triggered (direct)");
+        }
+    }
 }
 
 @end

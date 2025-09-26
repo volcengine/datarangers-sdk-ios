@@ -30,6 +30,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, copy, readonly) NSString *appID;
 
+@property (nonatomic, assign) BOOL eventReportingEnabled;
 
 + (NSString *)SDKVersion;
 
@@ -129,6 +130,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)flush;
 
 - (void)clearAllEvent;
+
+#pragma mark - Event Reporting Control
+- (void)flushEvents;
 
 @end
 

@@ -21,6 +21,8 @@
 #import "NSDictionary+VETyped.h"
 #import "BDAutoTrack+Private.h"
 
+#import <Security/Security.h>
+
 static NSString *const kAppLogCDKey         = @"kAppLogCDKey";
 static NSString *const kAppLogDeviceIDKey   = @"kAppLogBDDidKey";
 static NSString *const kAppLogInstallIDKey  = @"kAppLogInstallIDKey";
@@ -141,8 +143,9 @@ static NSString *const kAppLogDeviceID      = @"device_id";
     self.installID = [defaults stringValueForKey:installIDKey];
     self.ssID = [defaults stringValueForKey:ssIDKey];
 
-    self.deviceID = [defaults stringValueForKey:deviceIDKey];
-    self.cdValue = [defaults stringValueForKey:cdKey];
+    NSString *deviceIDKeychain = [deviceIDKey stringByAppendingFormat:@"_%@",self.appID];
+    self.deviceID = [defaults stringValueForKey:deviceIDKey] ?: [self keychain_load:deviceIDKeychain];
+    self.cdValue = [defaults stringValueForKey:cdKey] ?: [self keychain_load:cdKey];
 }
 
 - (void)saveAllID {
@@ -167,6 +170,10 @@ static NSString *const kAppLogDeviceID      = @"device_id";
     [defaults setValue:installID forKey:installIDKey];
     [defaults setValue:ssID forKey:ssIDKey];
     [defaults saveDataToFile];
+    
+    [self keychain_save:cdKey value:cdValue];
+    NSString *deviceIDKeychain = [deviceIDKey stringByAppendingFormat:@"_%@",self.appID];
+    [self keychain_save:deviceIDKeychain value:deviceID];
 }
 
 #pragma mark - postRegisterNotification
@@ -201,6 +208,75 @@ static NSString *const kAppLogDeviceID      = @"device_id";
                                                         object:nil
                                                       userInfo:userInfo];
 }
+
+#pragma mark - Keychain Methods
+- (NSString *)keychain_load:(NSString *)key {
+    if (key.length == 0) {
+        return nil;
+    }
+    
+    NSString *service = [[NSBundle mainBundle] bundleIdentifier];
+    if (!service) {
+        service = @"com.rangersapplog.default";
+    }
+    
+    NSDictionary *query = @{
+        (__bridge NSString *)kSecClass: (__bridge NSString *)kSecClassGenericPassword,
+        (__bridge NSString *)kSecAttrService: service,
+        (__bridge NSString *)kSecAttrAccount: key,
+        (__bridge NSString *)kSecReturnData: (__bridge NSNumber *)kCFBooleanTrue,
+        (__bridge NSString *)kSecMatchLimit: (__bridge NSString *)kSecMatchLimitOne
+    };
+    
+    CFDataRef dataRef = NULL;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, (CFTypeRef *)&dataRef);
+    
+    if (status == errSecSuccess && dataRef) {
+        NSData *data = (__bridge_transfer NSData *)dataRef;
+        NSString *result = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+        return result;
+    }
+    
+    return nil;
+}
+
+- (void)keychain_save:(NSString *)key value:(NSString *)value {
+    if (key.length == 0 || value.length == 0) {
+        return;
+    }
+    
+    NSString *service = [[NSBundle mainBundle] bundleIdentifier];
+    if (!service) {
+        service = @"com.rangersapplog.default";
+    }
+    
+    NSDictionary *query = @{
+        (__bridge NSString *)kSecClass: (__bridge NSString *)kSecClassGenericPassword,
+        (__bridge NSString *)kSecAttrService: service,
+        (__bridge NSString *)kSecAttrAccount: key,
+        (__bridge NSString *)kSecReturnData: (__bridge NSNumber *)kCFBooleanTrue,
+        (__bridge NSString *)kSecMatchLimit: (__bridge NSString *)kSecMatchLimitOne
+    };
+    
+    CFDataRef dataRef = NULL;
+    OSStatus status = SecItemCopyMatching((__bridge CFDictionaryRef)query, (CFTypeRef *)&dataRef);
+    
+    if (status == errSecSuccess && dataRef) {
+        CFRelease(dataRef);
+        return;
+    }
+    
+    NSData *data = [value dataUsingEncoding:NSUTF8StringEncoding];
+    NSDictionary *addQuery = @{
+        (__bridge NSString *)kSecClass: (__bridge NSString *)kSecClassGenericPassword,
+        (__bridge NSString *)kSecAttrService: service,
+        (__bridge NSString *)kSecAttrAccount: key,
+        (__bridge NSString *)kSecValueData: data
+    };
+    
+    SecItemAdd((__bridge CFDictionaryRef)addQuery, NULL);
+}
+
 
 @end
 
